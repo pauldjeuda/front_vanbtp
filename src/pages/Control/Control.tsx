@@ -51,8 +51,10 @@ export const ControlPage = () => {
 
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
   const [incidentStep, setIncidentStep] = useState(1);
+  const [isSubmittingIncident, setIsSubmittingIncident] = useState(false);
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
   const [auditStep, setAuditStep] = useState(1);
+  const [isSubmittingAudit, setIsSubmittingAudit] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<any>(null);
   const [selectedAudit, setSelectedAudit] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'hse' | 'quality'>('all');
@@ -140,39 +142,48 @@ export const ControlPage = () => {
     if (incidentStep < 2) {
       setIncidentStep(incidentStep + 1);
     } else {
-      const incidentId = Date.now();
-      const incidentTitle = newIncident.title || `${newIncident.type} - ${getProjectNameById(newIncident.projectId)}`;
-      await addIncident({
-        projectId: newIncident.projectId,
-        type: newIncident.type,
-        category: newIncident.type.toLowerCase().includes('accident') || newIncident.type.toLowerCase().includes('hse') || newIncident.type.toLowerCase().includes('pollution') ? 'hse' : 'quality',
-        // Mapper 'Moyen' vers 'Modéré' (ENUM DB: Mineur/Modéré/Grave/Critique)
-        gravity: newIncident.gravity === 'Moyen' ? 'Modéré' : (newIncident.gravity || 'Mineur'),
-        title: incidentTitle,
-        description: newIncident.desc,
-        incidentDate: new Date().toISOString().split('T')[0],
-        // status ENUM DB: 'Ouvert', 'En cours de traitement', 'Résolu', 'Fermé'
-        status: 'Ouvert',
-        actionPlan: 'Analyse en cours par le responsable HSE.',
-        impact: 'Évaluation de l\'impact en cours.'
-});
-      addLog({
-        module: 'Contrôle',
-        action: `Déclaration d'un incident: ${incidentTitle}`,
-        user: name || 'Utilisateur',
-        type: 'danger'
-      });
-      notify(`Incident "${incidentTitle}" déclaré avec succès.`, 'warning', '/control');
-      setIsIncidentModalOpen(false);
-      setIncidentStep(1);
-      setIncidentImage(null);
-      setNewIncident({
-        type: 'Accident de travail',
-        gravity: 'Moyen',
-        projectId: projects[0]?.id || 0,
-        desc: '',
-        title: ''
-      });
+      if (isSubmittingIncident) return; // Protection contre les clics multiples
+      
+      setIsSubmittingIncident(true);
+      try {
+        const incidentId = Date.now();
+        const incidentTitle = newIncident.title || `${newIncident.type} - ${getProjectNameById(newIncident.projectId)}`;
+        await addIncident({
+          projectId: newIncident.projectId,
+          type: newIncident.type,
+          category: newIncident.type.toLowerCase().includes('accident') || newIncident.type.toLowerCase().includes('hse') || newIncident.type.toLowerCase().includes('pollution') ? 'hse' : 'quality',
+          // Mapper 'Moyen' vers 'Modéré' (ENUM DB: Mineur/Modéré/Grave/Critique)
+          gravity: newIncident.gravity === 'Moyen' ? 'Modéré' : (newIncident.gravity || 'Mineur'),
+          title: incidentTitle,
+          description: newIncident.desc,
+          incidentDate: new Date().toISOString().split('T')[0],
+          // status ENUM DB: 'Ouvert', 'En cours de traitement', 'Résolu', 'Fermé'
+          status: 'Ouvert',
+          actionPlan: 'Analyse en cours par le responsable HSE.',
+          impact: 'Évaluation de l\'impact en cours.'
+        });
+        addLog({
+          module: 'Contrôle',
+          action: `Déclaration d'un incident: ${incidentTitle}`,
+          user: name || 'Utilisateur',
+          type: 'danger'
+        });
+        notify(`Incident "${incidentTitle}" déclaré avec succès.`, 'warning', '/control');
+        setIsIncidentModalOpen(false);
+        setIncidentStep(1);
+        setIncidentImage(null);
+        setNewIncident({
+          type: 'Accident de travail',
+          gravity: 'Moyen',
+          projectId: projects[0]?.id || 0,
+          desc: '',
+          title: ''
+        });
+      } catch (err: any) {
+        notify(err?.message || 'Erreur lors de la déclaration de l\'incident', 'error');
+      } finally {
+        setIsSubmittingIncident(false);
+      }
     }
   };
 
@@ -181,8 +192,12 @@ export const ControlPage = () => {
     if (auditStep < 2) {
       setAuditStep(auditStep + 1);
     } else {
-      await addAudit({
-        title: newAudit.type,
+      if (isSubmittingAudit) return; // Protection contre les clics multiples
+      
+      setIsSubmittingAudit(true);
+      try {
+        await addAudit({
+          title: newAudit.type,
         auditDate: newAudit.date || new Date().toISOString().split('T')[0],
         auditor: newAudit.auditor,
         projectId: newAudit.projectId,
@@ -201,15 +216,20 @@ export const ControlPage = () => {
       setIsAuditModalOpen(false);
       setAuditStep(1);
       setNewAudit({
-        type: 'Inspection HSE Terrain',
-        projectId: projects[0]?.id || 0,
-        auditor: '',
-        date: '',
-        location: '',
-        observations: '',
-        recommendations: '',
-        score: ''
-      });
+          type: 'Inspection HSE Terrain',
+          projectId: projects[0]?.id || 0,
+          auditor: '',
+          date: '',
+          location: '',
+          observations: '',
+          recommendations: '',
+          score: ''
+        });
+      } catch (err: any) {
+        notify(err?.message || 'Erreur lors de la planification de l\'audit', 'error');
+      } finally {
+        setIsSubmittingAudit(false);
+      }
     }
   };
 
@@ -1133,8 +1153,15 @@ export const ControlPage = () => {
               <Button variant="outline" type="button" onClick={() => incidentStep > 1 ? setIncidentStep(1) : setIsIncidentModalOpen(false)} className="font-bold h-12 px-6">
                 {incidentStep === 1 ? 'Annuler' : 'Précédent'}
               </Button>
-              <Button variant="danger" type="submit" className="px-8 font-bold h-12 shadow-lg shadow-red-900/20">
-                {incidentStep === 2 ? 'Fermer' : 'Envoyer le Rapport'}
+              <Button variant="danger" type="submit" className="px-8 font-bold h-12 shadow-lg shadow-red-900/20" disabled={isSubmittingIncident}>
+                {isSubmittingIncident ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Traitement...
+                  </>
+                ) : (
+                  incidentStep === 2 ? 'Fermer' : 'Envoyer le Rapport'
+                )}
               </Button>
             </div>
           </form>
@@ -1256,8 +1283,15 @@ export const ControlPage = () => {
               <Button variant="outline" type="button" onClick={() => auditStep > 1 ? setAuditStep(1) : setIsAuditModalOpen(false)} className="font-bold h-12 px-6">
                 {auditStep === 1 ? 'Annuler' : 'Précédent'}
               </Button>
-              <Button className="px-8 font-bold h-12 shadow-lg shadow-blue-900/20" type="submit">
-                {auditStep === 2 ? 'Terminer' : (auditStep === 1 ? 'Suivant' : 'Enregistrer')}
+              <Button className="px-8 font-bold h-12 shadow-lg shadow-blue-900/20" type="submit" disabled={isSubmittingAudit}>
+                {isSubmittingAudit ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Traitement...
+                  </>
+                ) : (
+                  auditStep === 2 ? 'Terminer' : (auditStep === 1 ? 'Suivant' : 'Enregistrer')
+                )}
               </Button>
             </div>
           </form>

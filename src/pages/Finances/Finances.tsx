@@ -51,9 +51,9 @@ const MarginBar = ({ value }: { value: number }) => {
 
 const AlertBadge = ({ alert }: { alert: string }) => {
   const cfg: Record<string, { label: string; cls: string }> = {
-    ok:      { label: 'Sain',         cls: 'bg-emerald-100 text-emerald-700' },
-    warning: { label: 'Vigilance',    cls: 'bg-amber-100 text-amber-700' },
-    danger:  { label: 'Critique',     cls: 'bg-red-100 text-red-700' },
+    ok: { label: 'Sain', cls: 'bg-emerald-100 text-emerald-700' },
+    warning: { label: 'Vigilance', cls: 'bg-amber-100 text-amber-700' },
+    danger: { label: 'Critique', cls: 'bg-red-100 text-red-700' },
     neutral: { label: 'Sans facture', cls: 'bg-slate-100 text-slate-500' },
   };
   const { label, cls } = cfg[alert] || { label: alert, cls: 'bg-slate-100 text-slate-600' };
@@ -71,7 +71,7 @@ export const FinancesPage = () => {
 
   // ── Onglets ──
   const [mainTab, setMainTab] = useState<'flux' | 'rentabilite' | 'comptabilite'>('flux');
-  const [txTab, setTxTab]     = useState<'all' | 'expenses' | 'invoices'>('all');
+  const [txTab, setTxTab] = useState<'all' | 'expenses' | 'invoices'>('all');
 
   // ── Filtres ──
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<number | null>(null);
@@ -79,10 +79,10 @@ export const FinancesPage = () => {
   const [visibleCount, setVisibleCount] = useState(15);
 
   // ── Modales ──
-  const [isExpenseModalOpen, setIsExpenseModalOpen]   = useState(false);
-  const [expenseStep, setExpenseStep]                 = useState(1);
-  const [isInvoiceModalOpen, setIsInvoiceModalOpen]   = useState(false);
-  const [isPaymentModalOpen, setIsPaymentModalOpen]   = useState(false);
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [expenseStep, setExpenseStep] = useState(1);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [isFinanceErrorModalOpen, setIsFinanceErrorModalOpen] = useState(false);
   const [financeErrorMessage, setFinanceErrorMessage] = useState('');
@@ -93,24 +93,24 @@ export const FinancesPage = () => {
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
   // ── Dettes ──
-  const [debts, setDebts]                           = useState<any[]>([]);
-  const [isLoadingDebts, setIsLoadingDebts]         = useState(false);
-  const [selectedDebt, setSelectedDebt]             = useState<any>(null);
+  const [debts, setDebts] = useState<any[]>([]);
+  const [isLoadingDebts, setIsLoadingDebts] = useState(false);
+  const [selectedDebt, setSelectedDebt] = useState<any>(null);
   const [isRepaymentModalOpen, setIsRepaymentModalOpen] = useState(false);
   const [isSubmittingRepayment, setIsSubmittingRepayment] = useState(false);
-  const [newRepayment, setNewRepayment]             = useState({
+  const [newRepayment, setNewRepayment] = useState({
     amount: '', repaymentDate: today, paymentMethod: 'Virement', reference: '', note: '',
   });
 
   // ── KPIs Rentabilité ──
-  const [analysis, setAnalysis]     = useState<any>(null);
-  const [kpiData, setKpiData]       = useState<any>(null);
+  const [analysis, setAnalysis] = useState<any>(null);
+  const [kpiData, setKpiData] = useState<any>(null);
   const [loadingKpi, setLoadingKpi] = useState(false);
 
   // ── Comptabilité ──
-  const [accounting, setAccounting]         = useState<any[]>([]);
+  const [accounting, setAccounting] = useState<any[]>([]);
   const [loadingAccounting, setLoadingAccounting] = useState(false);
-  const [accFilters, setAccFilters]         = useState({ projectId: '', from: '', to: '' });
+  const [accFilters, setAccFilters] = useState({ projectId: '', from: '', to: '' });
 
   // ── Forms ──
   const CATEGORY_PROVIDERS: Record<string, string> = {
@@ -134,15 +134,15 @@ export const FinancesPage = () => {
   const getProjectNameById = (id?: number) => projects.find((p: any) => p.id === id)?.name || 'Chantier inconnu';
 
   // ── Calculs ──
-  const filteredTx  = transactions.filter((t: any) => selectedProjectFilter === null || t.projectId === selectedProjectFilter);
-  const encaisse    = Math.abs(filteredTx.filter((t: any) => t.type === 'invoice' && t.status === 'Payé').reduce((s: number, t: any) => s + (t.amount || 0), 0));
-  const depenses    = Math.abs(filteredTx.filter((t: any) => t.type === 'expense').reduce((s: number, t: any) => s + (t.amount || 0), 0));
-  const tresorerie  = encaisse - depenses;
+  const filteredTx = transactions.filter((t: any) => selectedProjectFilter === null || t.projectId === selectedProjectFilter);
+  const encaisse = Math.abs(filteredTx.filter((t: any) => t.type === 'invoice' && t.status === 'Payé').reduce((s: number, t: any) => s + (t.amount || 0), 0));
+  const depenses = Math.abs(filteredTx.filter((t: any) => t.type === 'expense').reduce((s: number, t: any) => s + (t.amount || 0), 0));
+  const tresorerie = encaisse - depenses;
   const impayeesTotal = Math.abs(filteredTx.filter((t: any) => t.type === 'invoice' && t.status !== 'Payé' && t.status !== 'Rejeté').reduce((s: number, t: any) => s + (t.amount || 0), 0));
-  const overdueCount  = transactions.filter((t: any) => t.type === 'invoice' && t.status !== 'Payé' && t.status !== 'Rejeté' && t.dueDate && t.dueDate < today).length;
+  const overdueCount = transactions.filter((t: any) => t.type === 'invoice' && t.status !== 'Payé' && t.status !== 'Rejeté' && t.dueDate && t.dueDate < today).length;
 
   const displayedTx = transactions.filter((t: any) => {
-    const matchTab  = txTab === 'all' || (txTab === 'expenses' && t.type === 'expense') || (txTab === 'invoices' && t.type === 'invoice');
+    const matchTab = txTab === 'all' || (txTab === 'expenses' && t.type === 'expense') || (txTab === 'invoices' && t.type === 'invoice');
     const matchProj = selectedProjectFilter === null || t.projectId === selectedProjectFilter;
     const q = searchQuery.toLowerCase();
     const matchQ = !q || getProjectNameById(t.projectId).toLowerCase().includes(q)
@@ -208,36 +208,36 @@ export const FinancesPage = () => {
 
   const handleExpenseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Empêcher les soumissions multiples
     if (isSubmittingExpense) return;
     setIsSubmittingExpense(true);
-    
-    if (expenseStep < 2) { 
+
+    if (expenseStep < 2) {
       setIsSubmittingExpense(false);
-      setExpenseStep(2); 
-      return; 
+      setExpenseStep(2);
+      return;
     }
-    
+
     const amount = parseInt(newExpense.amount) || 0;
     const projectTotalEncaisse = transactions
       .filter((t: any) => t.projectId === newExpense.projectId && t.type === 'invoice' && t.status === 'Payé')
       .reduce((s: number, t: any) => s + t.amount, 0);
     if (projectTotalEncaisse === 0) {
       setFinanceErrorMessage(`Aucun encaissement pour ce chantier. Enregistrez d'abord un versement client.`);
-      setIsFinanceErrorModalOpen(true); 
-      setIsExpenseModalOpen(false); 
-      setExpenseStep(1); 
+      setIsFinanceErrorModalOpen(true);
+      setIsExpenseModalOpen(false);
+      setExpenseStep(1);
       setIsSubmittingExpense(false);
       return;
     }
     if (amount > projectTotalEncaisse) {
       setFinanceErrorMessage(`Fonds insuffisants : ${fmt(projectTotalEncaisse)} FCFA disponible, ${fmt(amount)} FCFA demandé.`);
-      setIsFinanceErrorModalOpen(true); 
+      setIsFinanceErrorModalOpen(true);
       setIsSubmittingExpense(false);
       return;
     }
-    
+
     try {
       await addTransaction({
         date: newExpense.date, projectId: newExpense.projectId,
@@ -249,8 +249,8 @@ export const FinancesPage = () => {
       setIsExpenseModalOpen(false);
       setExpenseStep(1);
       setNewExpense({ projectId: projects[0]?.id || 0, category: 'Ciment', provider: 'CIMENCAM', amount: '', date: today, isClientDebt: false });
-    } catch (err: any) { 
-      notify(err?.message || 'Erreur', 'error'); 
+    } catch (err: any) {
+      notify(err?.message || 'Erreur', 'error');
     } finally {
       setIsSubmittingExpense(false);
     }
@@ -258,15 +258,15 @@ export const FinancesPage = () => {
 
   const handleInvoiceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Empêcher les soumissions multiples
     if (isSubmittingInvoice) return;
     setIsSubmittingInvoice(true);
-    
+
     const amount = parseInt(newInvoice.amount) || 0;
     try {
       await addTransaction({
-        date: today, 
+        date: today,
         transactionDate: today,
         projectId: newInvoice.projectId,
         category: newInvoice.categorieFacture, categorieFacture: newInvoice.categorieFacture,
@@ -278,8 +278,8 @@ export const FinancesPage = () => {
       notify(`Facture de ${fmt(amount)} FCFA émise`, 'success');
       setIsInvoiceModalOpen(false);
       setNewInvoice({ projectId: projects[0]?.id || 0, period: '', amount: '', progress: '', client: '', categorieFacture: 'Situation Travaux', dueDate: '', description: '' });
-    } catch (err: any) { 
-      notify(err?.message || 'Erreur', 'error'); 
+    } catch (err: any) {
+      notify(err?.message || 'Erreur', 'error');
     } finally {
       setIsSubmittingInvoice(false);
     }
@@ -287,16 +287,16 @@ export const FinancesPage = () => {
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Empêcher les soumissions multiples
     if (isSubmittingPayment) return;
     setIsSubmittingPayment(true);
-    
+
     const amount = parseInt(newPayment.amount) || 0;
     try {
       await addTransaction({
-        date: newPayment.date, 
-        transactionDate: newPayment.date, 
+        date: newPayment.date,
+        transactionDate: newPayment.date,
         projectId: newPayment.projectId,
         category: 'Encaissement', client: newPayment.client || 'Client',
         amount, status: 'Payé', type: 'invoice', paymentMethod: newPayment.method,
@@ -305,8 +305,8 @@ export const FinancesPage = () => {
       notify(`Encaissement de ${fmt(amount)} FCFA validé`, 'success');
       setIsPaymentModalOpen(false);
       setNewPayment({ projectId: projects[0]?.id || 0, client: '', amount: '', date: today, method: 'Virement Bancaire' });
-    } catch (err: any) { 
-      notify(err?.message || 'Erreur', 'error'); 
+    } catch (err: any) {
+      notify(err?.message || 'Erreur', 'error');
     } finally {
       setIsSubmittingPayment(false);
     }
@@ -351,12 +351,14 @@ export const FinancesPage = () => {
       {/* KPI CARDS — vraies données, sans faux pourcentages */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         {[
-          { label: 'Total Encaissé',    value: encaisse,  Icon: TrendingUp,   colorCls: 'text-emerald-600', bgCls: 'bg-emerald-50', trend: 'Paiements clients reçus' },
-          { label: 'Dépenses Engagées', value: depenses,  Icon: TrendingDown, colorCls: 'text-red-600',     bgCls: 'bg-red-50',     trend: 'Charges validées' },
-          { label: 'Trésorerie Nette',  value: tresorerie, Icon: Banknote,
+          { label: 'Total Encaissé', value: encaisse, Icon: TrendingUp, colorCls: 'text-emerald-600', bgCls: 'bg-emerald-50', trend: 'Paiements clients reçus' },
+          { label: 'Dépenses Engagées', value: depenses, Icon: TrendingDown, colorCls: 'text-red-600', bgCls: 'bg-red-50', trend: 'Charges validées' },
+          {
+            label: 'Trésorerie Nette', value: tresorerie, Icon: Banknote,
             colorCls: tresorerie >= 0 ? 'text-blue-600' : 'text-red-600',
-            bgCls:    tresorerie >= 0 ? 'bg-blue-50'   : 'bg-red-50',
-            trend:    tresorerie >= 0 ? 'Situation excédentaire' : 'Situation déficitaire' },
+            bgCls: tresorerie >= 0 ? 'bg-blue-50' : 'bg-red-50',
+            trend: tresorerie >= 0 ? 'Situation excédentaire' : 'Situation déficitaire'
+          },
         ].map(({ label, value, Icon, colorCls, bgCls, trend }) => (
           <Card key={label} className="p-6 border-none shadow-lg shadow-slate-200/50 hover:shadow-xl transition-all group overflow-hidden relative">
             <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-slate-50 rounded-full group-hover:scale-110 transition-transform duration-500" />
@@ -392,8 +394,8 @@ export const FinancesPage = () => {
       {/* ONGLETS PRINCIPAUX */}
       <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
         {([
-          { key: 'flux',         label: 'Flux de trésorerie' },
-          { key: 'rentabilite',  label: 'Rentabilité' },
+          { key: 'flux', label: 'Flux de trésorerie' },
+          { key: 'rentabilite', label: 'Rentabilité' },
           { key: 'comptabilite', label: 'Comptabilité' },
         ] as const).map(tab => (
           <button key={tab.key} onClick={() => setMainTab(tab.key)}
@@ -411,7 +413,7 @@ export const FinancesPage = () => {
             <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
                 {([
-                  { k: 'all',      label: 'Tout' },
+                  { k: 'all', label: 'Tout' },
                   { k: 'expenses', label: 'Dépenses' },
                   { k: 'invoices', label: 'Factures' },
                 ] as const).map(t => (
@@ -583,7 +585,7 @@ export const FinancesPage = () => {
                   <table className="min-w-full">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200">
-                        {['Chantier', 'Budget prévu', 'Dépenses', 'Écart', 'CA facturé', 'À facturer', 'Marge', 'Taux marge', 'Statut'].map(h => (<th key={h} className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>))}
+                        {['Chantier', 'Budget prévu', 'Dépenses', 'Écart', 'CA facturé', 'À facturer', 'Reste', 'Taux marge', 'Statut'].map(h => (<th key={h} className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -708,10 +710,10 @@ export const FinancesPage = () => {
                         <td className="px-4 py-3 text-sm text-slate-700 max-w-[180px] truncate" title={entry.label}>{entry.label}</td>
                         <td className="px-4 py-3">
                           <span className={cn('text-xs font-bold px-2 py-0.5 rounded-full font-mono', {
-                            'bg-blue-100 text-blue-700':       entry.account === '411',
+                            'bg-blue-100 text-blue-700': entry.account === '411',
                             'bg-emerald-100 text-emerald-700': entry.account === '706',
-                            'bg-amber-100 text-amber-700':     entry.account === '601',
-                            'bg-slate-100 text-slate-600':     entry.account === '401',
+                            'bg-amber-100 text-amber-700': entry.account === '601',
+                            'bg-slate-100 text-slate-600': entry.account === '401',
                           })}>
                             {entry.account} {entry.accountLabel}
                           </span>
@@ -808,8 +810,8 @@ export const FinancesPage = () => {
             <Button variant="ghost" type="button" onClick={() => expenseStep > 1 ? setExpenseStep(1) : setIsExpenseModalOpen(false)}>
               {expenseStep === 1 ? 'Annuler' : 'Retour'}
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={isSubmittingExpense}
               className="disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -840,10 +842,10 @@ export const FinancesPage = () => {
             <label className="text-sm font-medium text-slate-700">Type de facture *</label>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { value: 'Situation Travaux',      label: 'Situation Travaux',         desc: 'Avancement en cours' },
-                { value: 'Honoraires Études',       label: 'Honoraires Études',         desc: 'Études et conception' },
-                { value: 'Honoraires Réalisation',  label: 'Honoraires Réalisation',    desc: 'Pilotage travaux' },
-                { value: 'Décompte Final',          label: 'Décompte Final',            desc: 'Clôture du marché' },
+                { value: 'Situation Travaux', label: 'Situation Travaux', desc: 'Avancement en cours' },
+                { value: 'Honoraires Études', label: 'Honoraires Études', desc: 'Études et conception' },
+                { value: 'Honoraires Réalisation', label: 'Honoraires Réalisation', desc: 'Pilotage travaux' },
+                { value: 'Décompte Final', label: 'Décompte Final', desc: 'Clôture du marché' },
               ].map(opt => (
                 <button key={opt.value} type="button" onClick={() => setNewInvoice(p => ({ ...p, categorieFacture: opt.value }))}
                   className={`p-3 rounded-xl border-2 text-left transition-all ${newInvoice.categorieFacture === opt.value ? 'border-[var(--color-primary)] bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
@@ -874,7 +876,7 @@ export const FinancesPage = () => {
           )}
           <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
             <Button variant="ghost" type="button" onClick={() => setIsInvoiceModalOpen(false)}>Annuler</Button>
-            <Button 
+            <Button
               type="submit"
               disabled={isSubmittingInvoice}
               className="disabled:opacity-50 disabled:cursor-not-allowed"
@@ -921,8 +923,8 @@ export const FinancesPage = () => {
           </div>
           <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
             <Button variant="ghost" type="button" onClick={() => setIsPaymentModalOpen(false)}>Annuler</Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isSubmittingPayment}
             >

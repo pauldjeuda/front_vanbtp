@@ -175,6 +175,19 @@ export const ProjectsPage = () => {
     'Sud-Ouest'
   ];
 
+  const regionCities: Record<string, string[]> = {
+    'Littoral': ['Douala', 'Edéa', 'Nkongsamba', 'Yabassi', 'Mouanko', 'Loum', 'Mbanga'],
+    'Centre': ['Yaoundé', 'Mbalmayo', 'Obala', 'Bafia', 'Nan-Eboko', 'Eseka', 'Akonolinga'],
+    'Sud': ['Ebolowa', 'Kribi', 'Sangmélima', 'Ambam', 'Kyé-Ossi', 'Lolodorf'],
+    'Ouest': ['Bafoussam', 'Dschang', 'Foumban', 'Bafang', 'Mbouda', 'Baham', 'Bangangté'],
+    'Est': ['Bertoua', 'Batouri', 'Abong-Mbang', 'Yokadouma', 'Garoua-Boulaï', 'Belabo'],
+    'Nord': ['Garoua', 'Guider', 'Figuil', 'Poli', 'Rey-Bouba', 'Lagdo'],
+    'Extrême-Nord': ['Maroua', 'Yagoua', 'Kousseri', 'Mokolo', 'Mora', 'Kaélé'],
+    'Adamaoua': ['Ngaoundéré', 'Meiganga', 'Tibati', 'Banyo', 'Tignère'],
+    'Nord-Ouest': ['Bamenda', 'Kumbo', 'Wum', 'Nkambe', 'Fundong', 'Bali'],
+    'Sud-Ouest': ['Buea', 'Limbe', 'Kumba', 'Mamfe', 'Tiko', 'Muyuka', 'Bangem']
+  };
+
   // Charger les projets depuis l'API au montage
   useEffect(() => {
     const loadProjects = async () => {
@@ -384,9 +397,9 @@ export const ProjectsPage = () => {
       {/* Project Grid/List */}
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {filteredProjects.map((project) => (
+          {filteredProjects.map((project, idx) => (
             <motion.div
-              key={project.id ?? `tmp-${project.code ?? Math.random()}`}
+              key={project.id || project.code || `idx-${idx}-${Math.random()}`}
               layout
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -541,8 +554,8 @@ export const ProjectsPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filteredProjects.map((project) => (
-                <tr key={project.id} className="group hover:bg-slate-50/50 transition-colors">
+              {filteredProjects.map((project, idx) => (
+                <tr key={project.id || project.code || `tr-${idx}-${Math.random()}`} className="group hover:bg-slate-50/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-[var(--color-primary)] group-hover:text-white transition-colors">
@@ -685,15 +698,35 @@ export const ProjectsPage = () => {
                   {/* Catégorie du chantier */}
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-slate-700">Catégorie du chantier</label>
-                    <select
-                      className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                      value={newProject.category}
-                      onChange={(e) => setNewProject({ ...newProject, category: e.target.value as any, subCategory: '' })}
-                    >
-                      <option value="Bâtiment"> Bâtiment</option>
-                      <option value="Voirie"> Voirie</option>
-                      <option value="Autre"> Autre</option>
-                    </select>
+                    <div className="flex flex-col gap-2">
+                      <select
+                        className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                        value={(newProject.category === 'Bâtiment' || newProject.category === 'Voirie') ? newProject.category : 'Autre'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === 'Autre') {
+                            setNewProject({ ...newProject, category: 'Autre', subCategory: '' });
+                          } else {
+                            setNewProject({ ...newProject, category: val as any, subCategory: '' });
+                          }
+                        }}
+                      >
+                        <option value="Bâtiment">Bâtiment</option>
+                        <option value="Voirie">Voirie</option>
+                        <option value="Autre">Autre (Saisie manuelle)</option>
+                      </select>
+
+                      {((newProject.category !== 'Bâtiment' && newProject.category !== 'Voirie') || newProject.category === 'Autre') && (
+                        <input
+                          type="text"
+                          className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)] animate-in fade-in slide-in-from-top-1 duration-200"
+                          placeholder="Précisez la catégorie (ex: Ouvrages d'Art, Hydraulique...)"
+                          value={newProject.category === 'Autre' ? '' : newProject.category}
+                          onChange={(e) => setNewProject({ ...newProject, category: e.target.value as any })}
+                          required
+                        />
+                      )}
+                    </div>
                   </div>
                   {newProject.category === 'Bâtiment' && (
                     <div className="space-y-1.5">
@@ -713,13 +746,41 @@ export const ProjectsPage = () => {
                     </div>
                   )}
                   </div>
-                  <Input
-                    label="Lieu d'Exécution"
-                    placeholder="Ville, PK..."
-                    required
-                    value={newProject.location}
-                    onChange={(e) => setNewProject({ ...newProject, location: e.target.value })}
-                  />
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-slate-700">Lieu d'Exécution</label>
+                    <div className="flex flex-col gap-2">
+                      <select
+                        className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                        value={regionCities[newProject.region]?.includes(newProject.location) ? newProject.location : (newProject.location ? 'Autre' : '')}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === 'Autre') {
+                            setNewProject({ ...newProject, location: '' });
+                          } else {
+                            setNewProject({ ...newProject, location: val });
+                          }
+                        }}
+                        required
+                      >
+                        <option value="">— Sélectionner une ville —</option>
+                        {(regionCities[newProject.region] || []).map(city => (
+                          <option key={city} value={city}>{city}</option>
+                        ))}
+                        <option value="Autre">Autre (Saisie manuelle)</option>
+                      </select>
+                      
+                      {(!regionCities[newProject.region]?.includes(newProject.location) || newProject.location === '') && (
+                        <input
+                          type="text"
+                          className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)] animate-in fade-in slide-in-from-top-1 duration-200"
+                          placeholder="Saisir manuellement le lieu..."
+                          value={newProject.location}
+                          onChange={(e) => setNewProject({ ...newProject, location: e.target.value })}
+                          required
+                        />
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1329,21 +1390,115 @@ export const ProjectsPage = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <Input label="Budget (FCFA)" name="budget" defaultValue={editingProject?.budget} required />
-                <Input label="Localisation" name="location" defaultValue={editingProject?.location} required />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <Input label="Conducteur de Travaux" name="manager" defaultValue={editingProject?.manager} />
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-slate-700">Région</label>
                   <select
                     name="region"
                     className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    defaultValue={editingProject?.region}
+                    value={editingProject?.region}
+                    onChange={(e) => setEditingProject({ ...editingProject, region: e.target.value })}
                   >
                     {regions.filter(r => r !== 'Toutes les régions').map(r => (
                       <option key={r} value={r}>{r}</option>
                     ))}
                   </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-700">Catégorie du chantier</label>
+                  <div className="flex flex-col gap-2">
+                    <select
+                      className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      value={(editingProject?.category === 'Bâtiment' || editingProject?.category === 'Voirie') ? editingProject?.category : 'Autre'}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'Autre') {
+                          setEditingProject({ ...editingProject, category: 'Autre' });
+                        } else {
+                          setEditingProject({ ...editingProject, category: val });
+                        }
+                      }}
+                    >
+                      <option value="Bâtiment">Bâtiment</option>
+                      <option value="Voirie">Voirie</option>
+                      <option value="Autre">Autre (Saisie manuelle)</option>
+                    </select>
+
+                    {((editingProject?.category !== 'Bâtiment' && editingProject?.category !== 'Voirie') || editingProject?.category === 'Autre') && (
+                      <input
+                        name="category"
+                        type="text"
+                        className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)] animate-in fade-in slide-in-from-top-1 duration-200"
+                        placeholder="Précisez la catégorie..."
+                        value={editingProject?.category === 'Autre' ? '' : editingProject?.category}
+                        onChange={(e) => setEditingProject({ ...editingProject, category: e.target.value })}
+                        required
+                      />
+                    )}
+                    {/* Hidden input to ensure 'category' is sent in FormData if select is used */}
+                    {(editingProject?.category === 'Bâtiment' || editingProject?.category === 'Voirie') && (
+                      <input type="hidden" name="category" value={editingProject?.category} />
+                    )}
+                  </div>
+                </div>
+                {editingProject?.category === 'Bâtiment' && (
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-slate-700">Sous-catégorie</label>
+                    <select
+                      name="subCategory"
+                      className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      value={editingProject?.subCategory || ''}
+                      onChange={(e) => setEditingProject({ ...editingProject, subCategory: e.target.value })}
+                    >
+                      <option value="">— Sélectionner —</option>
+                      <option value="Gros œuvre">Gros œuvre</option>
+                      <option value="Second œuvre">Second œuvre</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Input label="Conducteur de Travaux" name="manager" defaultValue={editingProject?.manager} />
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-slate-700">Lieu d'Exécution</label>
+                  <div className="flex flex-col gap-2">
+                    <select
+                      className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      value={regionCities[editingProject?.region]?.includes(editingProject?.location) ? editingProject?.location : (editingProject?.location ? 'Autre' : '')}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'Autre') {
+                          setEditingProject({ ...editingProject, location: '' });
+                        } else {
+                          setEditingProject({ ...editingProject, location: val });
+                        }
+                      }}
+                      required
+                    >
+                      <option value="">— Sélectionner une ville —</option>
+                      {(regionCities[editingProject?.region] || []).map(city => (
+                        <option key={city} value={city}>{city}</option>
+                      ))}
+                      <option value="Autre">Autre (Saisie manuelle)</option>
+                    </select>
+                    
+                    {(!regionCities[editingProject?.region]?.includes(editingProject?.location) || editingProject?.location === '') && (
+                      <input
+                        name="location"
+                        type="text"
+                        className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)] animate-in fade-in slide-in-from-top-1 duration-200"
+                        placeholder="Saisir manuellement le lieu..."
+                        value={editingProject?.location || ''}
+                        onChange={(e) => setEditingProject({ ...editingProject, location: e.target.value })}
+                        required
+                      />
+                    )}
+                    {/* Hidden input to ensure 'location' is sent in FormData if select is used */}
+                    {regionCities[editingProject?.region]?.includes(editingProject?.location) && (
+                      <input type="hidden" name="location" value={editingProject?.location} />
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">

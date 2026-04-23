@@ -17,4 +17,27 @@ export const attendanceService = {
     const res = await api.get<{ data: any[] }>(`/api/attendance/employee/${employeeId}`);
     return res.data;
   },
+
+  // Individuel : pointer pour aujourd'hui
+  clockAction: async (payload: { employeeId: number; projectId: number; type: 'arrival' | 'departure' }) => {
+    const date = new Date().toISOString().split('T')[0];
+    const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    
+    const record: any = { employeeId: payload.employeeId };
+    if (payload.type === 'arrival') record.arrivalTime = time;
+    else record.departureTime = time;
+
+    const res = await api.post<{ data: any[] }>('/api/attendance/bulk', {
+      projectId: payload.projectId,
+      date,
+      records: [record]
+    });
+    return { ...res.data, time };
+  },
+
+  checkToday: async (employeeId: number) => {
+    const date = new Date().toISOString().split('T')[0];
+    const res = await api.get<{ data: any[] }>(`/api/attendance?employeeId=${employeeId}&date=${date}`);
+    return res.data[0] || null;
+  }
 };

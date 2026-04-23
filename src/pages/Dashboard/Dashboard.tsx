@@ -14,7 +14,9 @@ import {
   ChevronRight,
   Building2,
   HardHat,
-  Activity
+  Activity,
+  LogIn,
+  LogOut
 } from 'lucide-react';
 import { Card, cn, Button, Modal } from '../../components/ui';
 import {
@@ -47,6 +49,7 @@ import { useData } from '../../context/DataContext';
 import { useNotification } from '../../context/NotificationContext';
 import { projectService } from '../../services/project.service';
 import { dashboardService } from '../../services/dashboard.service';
+import { attendanceService } from '../../services/attendance.service';
 
 export const Dashboard = () => {
   const { can } = usePermissions();
@@ -110,6 +113,49 @@ export const Dashboard = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [selectedAlert, setSelectedAlert] = useState<any>(null);
   const [backendKpis, setBackendKpis] = useState<any | null>(null);
+
+  // Individual Clocking State
+  const [todayAttendance, setTodayAttendance] = useState<any>(null);
+  const [isClocking, setIsClocking] = useState(false);
+
+  useEffect(() => {
+    if (currentEmployee?.id) {
+      attendanceService.checkToday(currentEmployee.id).then(setTodayAttendance);
+    }
+  }, [currentEmployee?.id]);
+
+  const handleClockAction = async () => {
+    if (!currentEmployee?.id || !technicianProjectId) {
+      notify("Impossible de pointer : Vous n'êtes pas affecté à un chantier.", "warning");
+      return;
+    }
+    
+    setIsClocking(true);
+    try {
+      const type = todayAttendance?.arrivalTime ? 'departure' : 'arrival';
+      const result = await attendanceService.clockAction({
+        employeeId: currentEmployee.id,
+        projectId: technicianProjectId,
+        type
+      });
+      
+      // Update local state
+      const updated = await attendanceService.checkToday(currentEmployee.id);
+      setTodayAttendance(updated);
+      
+      const time = result.time;
+      const isLate = type === 'arrival' && time > '08:00';
+      const message = type === 'arrival' 
+        ? `Pointage d'arrivée à ${time}. ${isLate ? "Attention, vous êtes en retard (limite 08:00)." : "Vous êtes à l'heure !"}`
+        : `Pointage de départ à ${time}. Bonne soirée !`;
+        
+      notify(message, isLate ? 'warning' : 'success');
+    } catch (err: any) {
+      notify("Erreur lors du pointage.", "error");
+    } finally {
+      setIsClocking(false);
+    }
+  };
 
   // Filtered Data
   const effectiveProjectFilter = role === 'technicien' ? (technicianProjectId || 'None') : selectedProject;
@@ -612,10 +658,15 @@ export const Dashboard = () => {
             </div>
             <div className="h-[350px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={allMonths.map((m, i) => ({
-                  name: m,
-                  count: i < 6 ? 40 + i * 4 : 64 + (i - 6) * 2 // Simuler une croissance annuelle
-                }))}>
+                <BarChart data={allMonths.map((m, i) => {
+                  const currentYear = new Date().getFullYear();
+                  const count = employees.filter(e => {
+                    if (!e.dateEmbauche) return false;
+                    const d = new Date(e.dateEmbauche);
+                    return d.getFullYear() < currentYear || (d.getFullYear() === currentYear && d.getMonth() <= i);
+                  }).length;
+                  return { name: m, count: count || 0 };
+                })}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.1} />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'currentColor', fontSize: 10, fontWeight: 600, opacity: 0.5 }} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fill: 'currentColor', fontSize: 10, fontWeight: 600, opacity: 0.5 }} />
@@ -761,12 +812,13 @@ export const Dashboard = () => {
                   <PieChart>
                     <Pie
                       data={(role === 'dg' || role === 'chef') ? pieDataWithPercentage :
-                        role === 'rh' ? [
-                          { name: 'Encadrement', value: 15 },
-                          { name: 'Technique', value: 35 },
-                          { name: 'Ouvriers', value: 40 },
-                          { name: 'Support', value: 10 },
-                        ] : [
+                        role === 'rh' ? (() => {
+                          const roles = Array.from(new Set(employees.map(e => e.role || 'Autre')));
+                          return roles.map(r => ({
+                            name: r,
+                            value: employees.filter(e => e.role === r).length
+                          }));
+                        })() : [
                           { name: 'Pelles Hydrauliques', value: 40 },
                           { name: 'Bulldozers', value: 30 },
                           { name: 'Camions Benne', value: 20 },
@@ -1516,6 +1568,50 @@ export const Dashboard = () => {
           </Modal>
         )}
       </AnimatePresence>
+
+      {/* Floating Action Button for Attendance (Chef & Technicien) */}
+      {(role === 'chef' || role === 'technicien') && (
+        <motion.div 
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="fixed bottom-8 right-8 z-50"
+        >
+          <div className="relative group">
+            <Button
+              onClick={handleClockAction}
+              disabled={isClocking || (todayAttendance?.arrivalTime && todayAttendance?.departureTime)}
+              className={cn(
+                "w-16 h-16 rounded-full shadow-2xl flex items-center justify-center p-0 transition-all hover:scale-110",
+                !todayAttendance?.arrivalTime ? "bg-emerald-600 hover:bg-emerald-700" : 
+                !todayAttendance?.departureTime ? "bg-red-600 hover:bg-red-700" : 
+                "bg-slate-400 opacity-50 cursor-not-allowed"
+              )}
+            >
+              {isClocking ? (
+                <div className="animate-spin w-6 h-6 border-2 border-white border-t-transparent rounded-full" />
+              ) : !todayAttendance?.arrivalTime ? (
+                <LogIn className="w-8 h-8 text-white" />
+              ) : (
+                <LogOut className="w-8 h-8 text-white" />
+              )}
+            </Button>
+            
+            {/* Badge Tooltip */}
+            <div className="absolute bottom-full right-0 mb-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+              <div className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl whitespace-nowrap shadow-xl">
+                {!todayAttendance?.arrivalTime ? "Pointer mon Arrivée" : 
+                 !todayAttendance?.departureTime ? `Arrivé à ${todayAttendance.arrivalTime} • Pointer Départ` : 
+                 "Pointage du jour complété"}
+              </div>
+            </div>
+
+            {/* Pulsing indicator if not clocked in */}
+            {!todayAttendance?.arrivalTime && (
+              <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-25 -z-10" />
+            )}
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 };

@@ -40,6 +40,7 @@ export const ResourcesPage = () => {
   const { addLog } = useHistory();
   const {
     projects,
+    updateProject,
     employees,
     updateEmployee,
     addEmployee,
@@ -59,8 +60,53 @@ export const ResourcesPage = () => {
     deleteSubcontract
   } = useData();
 
+  const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'purchases' | 'stock' | 'equipment' | 'hr' | 'subcontracting' | 'pointage'>(
+    (role === 'dg' || role === 'chef') ? 'purchases' : (role === 'rh' ? 'hr' : 'stock')
+  );
+  // Pointage
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [attendanceProjectId, setAttendanceProjectId] = useState<number>(0);
+  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [attendanceHistory, setAttendanceHistory] = useState<any[]>([]);
+  const [isLoadingAttendance, setIsLoadingAttendance] = useState(false);
+  const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
+  const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+  const [purchaseStep, setPurchaseStep] = useState(1);
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const [stockStep, setStockStep] = useState(1);
+  const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
+  const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
+  const [selectedResource, setSelectedResource] = useState<any>(null);
+  const [hrSearchQuery, setHrSearchQuery] = useState('');
+  const [stockSearchQuery, setStockSearchQuery] = useState('');
+  const [selectedWarehouse, setSelectedWarehouse] = useState('Magasin Central');
+  const [isStockMovementModalOpen, setIsStockMovementModalOpen] = useState(false);
+  const [stockMovementStep, setStockMovementStep] = useState(1);
+  const [stockMovementType, setStockMovementType] = useState<'entry' | 'exit' | 'transfer'>('entry');
+  const [isLogbookModalOpen, setIsLogbookModalOpen] = useState(false);
+  const [isSubcontractModalOpen, setIsSubcontractModalOpen] = useState(false);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [isAssignEmployeeModalOpen, setIsAssignEmployeeModalOpen] = useState(false);
+  const [assigningEquipment, setAssigningEquipment] = useState<any>(null);
+  const [isAllOrdersModalOpen, setIsAllOrdersModalOpen] = useState(false);
+  const [isContractDetailsModalOpen, setIsContractDetailsModalOpen] = useState(false);
+  const [selectedContract, setSelectedContract] = useState<any>(null);
+  const [isManageContractModalOpen, setIsManageContractModalOpen] = useState(false);
+  const [isFullLogbookModalOpen, setIsFullLogbookModalOpen] = useState(false);
+  const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
+  const [orderFilterStatus, setOrderFilterStatus] = useState('all');
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [purchaseToUpdate, setPurchaseToUpdate] = useState<any>(null);
+  const [selectedStockProject, setSelectedStockProject] = useState<number | null>(null);
+  const [selectedEquipmentProject, setSelectedEquipmentProject] = useState<number | null>(null);
+  const [selectedProjectFilter, setSelectedProjectFilter] = useState<number | null>(null);
+
   const getProjectNameById = (projectId?: number) => projects.find(p => p.id === projectId)?.name || 'Chantier inconnu';
   const getProjectIdByName = (name?: string) => projects.find(p => p.name === name)?.id || 0;
+  const { notify } = useNotification();
 
   const handleAssign = async (emp: any, projectValue: string | number) => {
     const projectId = typeof projectValue === 'number' ? projectValue : getProjectIdByName(projectValue);
@@ -74,44 +120,12 @@ export const ResourcesPage = () => {
     }
   };
 
-  const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
-  const [employeeToDelete, setEmployeeToDelete] = useState<any>(null);
-
   const handleRemoveAssignment = (emp: any) => {
     setEmployeeToDelete(emp);
     setIsConfirmDeleteModalOpen(true);
   };
 
-  // Fonctions Pointage
-  const loadAttendance = async () => {
-    if (!attendanceProjectId) return;
-    setIsLoadingAttendance(true);
-    try {
-      const [history] = await Promise.all([
-        attendanceService.getAll({ projectId: attendanceProjectId, date: attendanceDate }),
-      ]);
-      setAttendanceHistory(history);
-      // Préparer les lignes pour aujourd'hui
-      const projectEmployees = employees.filter(e => Number(e.projectId) === attendanceProjectId);
-      const todayRecords = projectEmployees.map(emp => {
-        const existing = history.find((h: any) => Number(h.employeeId) === Number(emp.id));
-        return {
-          employeeId: emp.id,
-          name: emp.name,
-          matricule: emp.matricule,
-          role: emp.role,
-          arrivalTime: existing?.arrivalTime || '07:30',
-          departureTime: existing?.departureTime || '17:00',
-          status: existing?.status || 'Présent',
-          note: existing?.note || ''
-        };
-      });
-      setAttendanceRecords(todayRecords);
-    } catch { setAttendanceRecords([]); }
-    finally { setIsLoadingAttendance(false); }
-  };
-
-
+  const [selectedProjectForAdd, setSelectedProjectForAdd] = useState<number>(0);
 
   const handleSubmitAttendance = async () => {
     if (!attendanceProjectId) { notify('Sélectionnez un chantier', 'error'); return; }
@@ -136,49 +150,57 @@ export const ResourcesPage = () => {
       setEmployeeToDelete(null);
     }
   };
-  const { notify } = useNotification();
-  const [activeTab, setActiveTab] = useState<'purchases' | 'stock' | 'equipment' | 'hr' | 'subcontracting' | 'pointage'>(
-    (role === 'dg' || role === 'chef') ? 'purchases' : (role === 'rh' ? 'hr' : 'stock')
-  );
-  // Pointage
-  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
-  const [attendanceProjectId, setAttendanceProjectId] = useState<number>(0);
-  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
-  const [attendanceHistory, setAttendanceHistory] = useState<any[]>([]);
-  const [isLoadingAttendance, setIsLoadingAttendance] = useState(false);
-  const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
-  const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
-  const [purchaseStep, setPurchaseStep] = useState(1);
-  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
-  const [stockStep, setStockStep] = useState(1);
-  const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
-  const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
-  const [selectedResource, setSelectedResource] = useState<any>(null);
-  const [hrSearchQuery, setHrSearchQuery] = useState('');
-  const [stockSearchQuery, setStockSearchQuery] = useState('');
-  const [selectedWarehouse, setSelectedWarehouse] = useState('Magasin Central');
-  const WAREHOUSES = ['Magasin Central'];
-  const [isStockMovementModalOpen, setIsStockMovementModalOpen] = useState(false);
-  const [stockMovementStep, setStockMovementStep] = useState(1);
-  const [stockMovementType, setStockMovementType] = useState<'entry' | 'exit' | 'transfer'>('entry');
-  const [isLogbookModalOpen, setIsLogbookModalOpen] = useState(false);
-  const [isSubcontractModalOpen, setIsSubcontractModalOpen] = useState(false);
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [isAssignEmployeeModalOpen, setIsAssignEmployeeModalOpen] = useState(false);
-  const [assigningEquipment, setAssigningEquipment] = useState<any>(null);
-  const [isAllOrdersModalOpen, setIsAllOrdersModalOpen] = useState(false);
-  const [isContractDetailsModalOpen, setIsContractDetailsModalOpen] = useState(false);
-  const [selectedContract, setSelectedContract] = useState<any>(null);
-  const [isManageContractModalOpen, setIsManageContractModalOpen] = useState(false);
-  const [isFullLogbookModalOpen, setIsFullLogbookModalOpen] = useState(false);
-  const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
-  const [orderSearchQuery, setOrderSearchQuery] = useState('');
-  const [orderFilterStatus, setOrderFilterStatus] = useState('all');
-  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  const [purchaseToUpdate, setPurchaseToUpdate] = useState<any>(null);
-  const [selectedStockProject, setSelectedStockProject] = useState<number | null>(null);
-  const [selectedEquipmentProject, setSelectedEquipmentProject] = useState<number | null>(null);
-  const [selectedProjectFilter, setSelectedProjectFilter] = useState<number | null>(null);
+
+  const loadAttendance = async () => {
+    setIsLoadingAttendance(true);
+    try {
+      let history;
+      if (role === 'technicien') {
+        const me = employees.find(e => e.matricule === profile?.matricule) ||
+          employees.find(e => e.name === profile?.name);
+        if (me?.id) {
+          const res = await attendanceService.getHistory(me.id);
+          history = Array.isArray(res) ? res : res.data;
+        }
+      } else if (attendanceProjectId) {
+        const res = await attendanceService.getAll({ projectId: attendanceProjectId });
+        history = Array.isArray(res) ? res : res.data;
+      }
+
+      if (history) {
+        setAttendanceHistory(history);
+
+        // Update records for today (compatibility)
+        const todayStr = new Date().toISOString().split('T')[0];
+        const projectEmployees = employees.filter(e => Number(e.projectId) === attendanceProjectId);
+        const todayRecords = projectEmployees.map(emp => {
+          const existing = history.find((h: any) => Number(h.employeeId) === Number(emp.id) && h.date === todayStr);
+          return {
+            employeeId: emp.id,
+            name: emp.name,
+            matricule: emp.matricule,
+            role: emp.role,
+            arrivalTime: existing?.arrivalTime || '07:30',
+            departureTime: existing?.departureTime || '17:00',
+            status: existing?.status || 'Présent',
+            note: existing?.note || ''
+          };
+        });
+        setAttendanceRecords(todayRecords);
+      }
+    } catch (err) {
+      setAttendanceHistory([]);
+      setAttendanceRecords([]);
+    } finally {
+      setIsLoadingAttendance(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (activeTab === 'pointage') {
+      loadAttendance();
+    }
+  }, [activeTab, attendanceProjectId]);
 
   const stockItems = React.useMemo(() => [
     { name: 'Ciment CPJ 35', unit: 'Sacs', icon: Package, color: 'blue' },
@@ -238,7 +260,7 @@ export const ResourcesPage = () => {
     docRef: ''
   });
 
-  
+
   const itemUnits: Record<string, string> = {
     'Ciment CPJ 35': 'Tonnes',
     'Acier / Fer à béton': 'Tonnes',
@@ -311,8 +333,13 @@ export const ResourcesPage = () => {
   ];
 
   const [availableEmployees, setAvailableEmployees] = useState([
-    { name: 'Eric Mvondo', role: 'Technicien', project: 'Disponible', contract: 'CDI', niu: 'VMAT0003', matricule: 'VMAT0003' }, // Uniquement le technicien créé avec le script
+    { name: 'Paul Abena', role: 'DG', project: 'Disponible', contract: 'CDI', niu: 'VMAT0001', matricule: 'VMAT0001', phone: '690 00 00 01' },
+    { name: 'Jean Nkomo', role: 'Chef de Chantier', project: 'Disponible', contract: 'CDI', niu: 'VMAT0002', matricule: 'VMAT0002', phone: '691 00 00 02' },
+    { name: 'Eric Mvondo', role: 'Technicien', project: 'Disponible', contract: 'CDI', niu: 'VMAT0003', matricule: 'VMAT0003', phone: '692 00 00 03' },
   ]);
+
+  // État pour protéger contre les clics multiples
+  const [isAddingEmployee, setIsAddingEmployee] = useState(false);
 
   // État pour gérer l'affectation du technicien actuel
   const [technicianAssignment, setTechnicianAssignment] = useState({
@@ -517,7 +544,7 @@ export const ResourcesPage = () => {
 
   const [isSubmittingSubcontract, setIsSubmittingSubcontract] = useState(false);
   const [stockMovementError, setStockMovementError] = useState<string | null>(null);
-  
+
   // États pour les filtres du journal complet
   const [logbookFilters, setLogbookFilters] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -531,10 +558,10 @@ export const ResourcesPage = () => {
   // Fonction pour calculer le stock théorique réel par article
   const getTheoreticalStock = () => {
     const stockByItem: Record<string, { total: number; unit: string; items: string[] }> = {};
-    
+
     // Calculer le stock pour chaque article en fonction des mouvements
-    const items = ['Ciment CPJ 35', 'Sable de Sanaga', 'Gazole Chantier', 'EPI (Casques/Gilets)', 'Acier / Fer à béton', 'Pelles', 'Casques', 'Gravier'];
-    
+    const items = Array.from(new Set(stockMovements.map((m: any) => m.item))).filter(Boolean);
+
     items.forEach(item => {
       const itemMovements = stockMovements.filter((m: any) => m.item === item);
       const totalEntries = itemMovements
@@ -543,7 +570,7 @@ export const ResourcesPage = () => {
       const totalExits = itemMovements
         .filter((m: any) => m.type === 'Sortie')
         .reduce((sum: number, m: any) => sum + Number(m.qty || m.quantity || 0), 0);
-      
+
       const unit = itemMovements[0]?.unit || 'unités';
       stockByItem[item] = {
         total: totalEntries - totalExits,
@@ -551,7 +578,7 @@ export const ResourcesPage = () => {
         items: [item]
       };
     });
-    
+
     return stockByItem;
   };
 
@@ -579,32 +606,32 @@ export const ResourcesPage = () => {
   // Fonction pour filtrer les mouvements selon les filtres
   const getFilteredLogbook = () => {
     let filtered = stockMovements;
-    
+
     // Filtrer par date
     if (logbookFilters.date) {
-      filtered = filtered.filter((log: any) => 
+      filtered = filtered.filter((log: any) =>
         log.date && log.date.includes(logbookFilters.date)
       );
     }
-    
+
     // Filtrer par projet
     if (logbookFilters.projectId !== 'all') {
-      filtered = filtered.filter((log: any) => 
+      filtered = filtered.filter((log: any) =>
         Number(log.projectId) === Number(logbookFilters.projectId)
       );
     }
-    
+
     // Filtrer par type
     if (logbookFilters.type !== 'all') {
       const typeMap: Record<string, string[]> = {
         'entries': ['Entrée', 'Entrées (Réceptions)'],
         'exits': ['Sortie', 'Sorties (Consommations)']
       };
-      filtered = filtered.filter((log: any) => 
+      filtered = filtered.filter((log: any) =>
         typeMap[logbookFilters.type]?.includes(log.type)
       );
     }
-    
+
     return filtered;
   };
 
@@ -635,7 +662,7 @@ export const ResourcesPage = () => {
 
     try {
       setIsSubmittingSubcontract(true);
-      
+
       if (editingContract) {
         const tasksPayload = useLots
           ? newSubcontract.lots.flatMap(lot =>
@@ -719,7 +746,7 @@ export const ResourcesPage = () => {
   const handleStockMovementSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStockMovementError(null); // Réinitialiser l'erreur
-    
+
     // Toujours traiter le formulaire à l'étape 1
     if (stockMovementStep === 1) {
       const now = new Date();
@@ -821,12 +848,12 @@ export const ResourcesPage = () => {
         type: stockMovementType === 'exit' ? 'warning' : 'info'
       });
       notify(`Mouvement de stock (${labelForLog}) enregistré.`, 'success', '/resources');
-      
+
       // Passer à l'étape 2 pour afficher le message de succès
       setStockMovementStep(2);
       return;
     }
-    
+
     // Si on est à l'étape 2, fermer la modale
     if (stockMovementStep === 2) {
       setIsStockMovementModalOpen(false);
@@ -903,6 +930,7 @@ export const ResourcesPage = () => {
           { id: 'equipment', label: 'Parc Engins', icon: Truck, roles: ['dg', 'chef', 'technicien'] },
           { id: 'hr', label: 'Personnel & RH', icon: Users, roles: ['dg', 'chef', 'rh'] },
           { id: 'subcontracting', label: 'Sous-traitance', icon: Handshake, roles: ['dg', 'chef'] },
+          { id: 'pointage', label: 'Pointage & Heures', icon: Clock, roles: ['dg', 'chef', 'technicien', 'rh'] },
         ].filter(tab => tab.roles.includes(role || '')).map((tab) => (
           <button
             key={tab.id}
@@ -919,7 +947,8 @@ export const ResourcesPage = () => {
                 tab.id === 'stock' ? 'Stocks' :
                   tab.id === 'equipment' ? 'Engins' :
                     tab.id === 'hr' ? 'RH' :
-                      tab.id === 'subcontracting' ? 'ST' : tab.label}
+                      tab.id === 'subcontracting' ? 'ST' :
+                        tab.id === 'pointage' ? 'Points' : tab.label}
             </span>
           </button>
         ))}
@@ -1685,78 +1714,92 @@ export const ResourcesPage = () => {
       <Modal
         isOpen={isEmployeeModalOpen}
         onClose={() => setIsEmployeeModalOpen(false)}
-        title="Ajouter un Collaborateur (Filiale BTP)"
+        title="Ajouter un Collaborateur"
         size="lg"
       >
         <div className="space-y-6">
-          <div className="text-sm text-slate-500 mb-4">
-            Sélectionnez un collaborateur de la filiale BTP pour l'affecter à ce chantier.
-          </div>
-
-          <div className="overflow-x-auto border border-slate-100 rounded-2xl">
-            <table className="w-full">
-              <thead>
-                <tr className="text-left text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 bg-slate-50">
-                  <th className="px-6 py-4">Employé</th>
-                  <th className="px-6 py-4">Poste</th>
-                  <th className="px-6 py-4">Matricule</th>
-                  <th className="px-6 py-4 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {availableEmployees.map((emp, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-bold text-xs">
-                          {emp.name.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <span className="text-xs font-black text-slate-900">{emp.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-xs font-bold text-slate-600">{emp.role}</td>
-                    <td className="px-6 py-4 text-xs font-mono text-slate-500">{emp.matricule}</td>
-                    <td className="px-6 py-4 text-right">
-                      <Button
-                        size="sm"
-                        className="h-8 px-4 text-[10px] font-black uppercase tracking-widest"
-                        onClick={async () => {
-                          try {
-                            await addEmployee({
-                              name: emp.name,
-                              role: emp.role,
-                              matricule: emp.matricule,
-                              contract: emp.contract || 'CDD',
-                              niu: emp.niu || '',
-                              phone: emp.phone || '',
-                              projectId: projects[0]?.id || 1 // Utiliser un ID de projet valide au lieu de 0
-                            });
-                            // Retirer l'employé de la liste disponible après ajout
-                            setAvailableEmployees(prev => prev.filter(e => e.name !== emp.name));
-                            notify(`Le collaborateur ${emp.name} a été ajouté au registre.`, 'success', '/resources');
-                          } catch (err: any) {
-                            notify(err?.message || 'Erreur lors de l\'ajout', 'error', '/resources');
-                          }
-                        }}
-                      >
-                        Ajouter
-                      </Button>
-                    </td>
-                  </tr>
+          <div className="space-y-4">
+            <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+              <label className="text-[10px] font-black text-blue-700 uppercase tracking-[0.2em] mb-2 block">Affecter au Chantier d'accueil</label>
+              <select
+                value={selectedProjectForAdd}
+                onChange={(e) => setSelectedProjectForAdd(Number(e.target.value))}
+                className="w-full h-11 px-4 bg-white border border-blue-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              >
+                <option value={0}>— Sélectionner le chantier —</option>
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
-              </tbody>
-            </table>
+              </select>
+            </div>
+
+            <div className="overflow-x-auto border border-slate-100 rounded-2xl">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-left text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 bg-slate-50">
+                    <th className="px-6 py-4">Employé</th>
+                    <th className="px-6 py-4">Poste</th>
+                    <th className="px-6 py-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {availableEmployees.map((emp, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-bold text-xs uppercase">
+                            {emp.name.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <span className="text-xs font-black text-slate-900">{emp.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-xs font-bold text-slate-600">{emp.role}</td>
+                      <td className="px-6 py-4 text-right">
+                        <Button
+                          size="sm"
+                          variant={selectedProjectForAdd === 0 ? "outline" : "default"}
+                          className="h-8 px-4 text-[10px] font-black uppercase tracking-widest"
+                          disabled={isAddingEmployee || selectedProjectForAdd === 0}
+                          onClick={async () => {
+                            setIsAddingEmployee(true);
+                            try {
+                              await addEmployee({
+                                ...emp,
+                                projectId: selectedProjectForAdd
+                              });
+                              // Si c'est un chef de chantier, on l'assigne au projet
+                              if (emp.role === 'Chef de Chantier') {
+                                await updateProject(selectedProjectForAdd, { manager: emp.name });
+                              }
+                              setAvailableEmployees(prev => prev.filter(e => e.matricule !== emp.matricule));
+                              notify(`Collaborateur ${emp.name} affecté avec succès au chantier ${getProjectNameById(selectedProjectForAdd)}.`, 'success', '/resources');
+                              setIsEmployeeModalOpen(false);
+                            } catch (err: any) {
+                              notify(err?.message || 'Erreur lors de l\'ajout', 'error', '/resources');
+                            } finally {
+                              setIsAddingEmployee(false);
+                            }
+                          }}
+                        >
+                          Affecter
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="pt-6 border-t border-slate-100 flex justify-end">
             <Button variant="outline" onClick={() => setIsEmployeeModalOpen(false)} className="font-bold">
-              Annuler
+              Fermer
             </Button>
           </div>
         </div>
       </Modal>
 
-      
+
       {/* Equipment Request Modal */}
       <Modal
         isOpen={isEquipmentModalOpen}
@@ -2698,9 +2741,9 @@ export const ResourcesPage = () => {
           <div className="space-y-4">
             <div>
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Date du mouvement</label>
-              <Input 
-                type="date" 
-                min={today} 
+              <Input
+                type="date"
+                min={today}
                 value={logbookFilters.date}
                 onChange={(e) => setLogbookFilters({ ...logbookFilters, date: e.target.value })}
               />
@@ -2708,7 +2751,7 @@ export const ResourcesPage = () => {
             <div className="flex gap-4">
               <div className="flex-1">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Chantier concerné</label>
-                <select 
+                <select
                   className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                   value={logbookFilters.projectId}
                   onChange={(e) => setLogbookFilters({ ...logbookFilters, projectId: e.target.value })}
@@ -2723,7 +2766,7 @@ export const ResourcesPage = () => {
               </div>
               <div className="flex-1">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Type de mouvement</label>
-                <select 
+                <select
                   className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                   value={logbookFilters.type}
                   onChange={(e) => setLogbookFilters({ ...logbookFilters, type: e.target.value })}
@@ -2806,7 +2849,7 @@ export const ResourcesPage = () => {
             {inventoryData.map((item, i) => {
               const variance = item.observed - item.theoretical;
               const hasVariance = variance !== 0;
-              
+
               return (
                 <div key={i} className={cn(
                   "p-4 border rounded-xl space-y-3",
@@ -2830,7 +2873,7 @@ export const ResourcesPage = () => {
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Quantité Constatée</label>
                       <input
-                        type="number" 
+                        type="number"
                         min="0"
                         value={item.observed}
                         onChange={(e) => {
@@ -2875,18 +2918,18 @@ export const ResourcesPage = () => {
 
           <div className="pt-6 border-t border-slate-100 flex justify-end gap-3">
             <Button variant="outline" onClick={() => setIsInventoryModalOpen(false)}>Annuler</Button>
-            <Button 
-              className="font-bold shadow-lg shadow-blue-900/20" 
+            <Button
+              className="font-bold shadow-lg shadow-blue-900/20"
               onClick={() => {
                 // Valider qu'il y a des justifications pour tous les écarts
                 const itemsWithVariance = inventoryData.filter(item => item.variance !== 0);
                 const unjustifiedItems = itemsWithVariance.filter(item => !item.justification || item.justification.trim() === '');
-                
+
                 if (unjustifiedItems.length > 0) {
                   notify(`Veuillez justifier les écarts pour: ${unjustifiedItems.map(item => item.item).join(', ')}`, 'error', '/resources');
                   return;
                 }
-                
+
                 // Enregistrer l'inventaire
                 const inventoryRecord = {
                   date: new Date().toISOString().split('T')[0],
@@ -2900,7 +2943,7 @@ export const ResourcesPage = () => {
                   })),
                   user: name || 'Utilisateur'
                 };
-                
+
                 // Ajouter un log pour l'inventaire
                 addLog({
                   module: 'Ressources',
@@ -2908,7 +2951,7 @@ export const ResourcesPage = () => {
                   user: name || 'Utilisateur',
                   type: 'info'
                 });
-                
+
                 notify("Inventaire enregistré avec succès", "success", '/resources');
                 setIsInventoryModalOpen(false);
               }}
@@ -2920,376 +2963,121 @@ export const ResourcesPage = () => {
       </Modal>
 
       {/* === TAB POINTAGE === */}
+      {/* === TAB POINTAGE (Historique) === */}
       {activeTab === 'pointage' && (
         <div className="space-y-6">
-          {/* Sélecteurs date + chantier */}
-          <div className="flex flex-wrap gap-4 items-end">
-            <div className="space-y-1.5">
-              <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Chantier</label>
-              <select value={attendanceProjectId}
-                onChange={e => setAttendanceProjectId(Number(e.target.value))}
-                className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium bg-white min-w-[200px] focus:ring-2 focus:ring-[var(--color-primary)] outline-none">
-                <option value={0}>-- Sélectionner un chantier --</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <h3 className="text-xl font-black text-slate-900 tracking-tight">Historique des Présences</h3>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+                {role === 'technicien' ? "Mon journal de présence individuel" : "Suivi des présences par chantier"}
+              </p>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Date</label>
-              <input type="date" value={attendanceDate}
-                onChange={e => setAttendanceDate(e.target.value)}
-                className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium bg-white focus:ring-2 focus:ring-[var(--color-primary)] outline-none" />
-            </div>
-            {attendanceProjectId > 0 && (
-              <button onClick={handleSubmitAttendance} disabled={isSubmittingAttendance || attendanceRecords.length === 0}
-                className="flex items-center gap-2 px-6 py-2.5 bg-[var(--color-primary)] text-white text-sm font-black rounded-xl hover:opacity-90 disabled:opacity-50 transition-all">
-                {isSubmittingAttendance && <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />}
-                Sauvegarder le pointage
-              </button>
-            )}
-          </div>
 
-          {/* Tableau de pointage */}
-          {attendanceProjectId > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-              <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-                <div>
-                  <h3 className="font-black text-slate-900">Feuille de présence</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">{attendanceDate} · {projects.find(p => p.id === attendanceProjectId)?.name}</p>
-                </div>
-                <div className="flex gap-3 text-xs font-bold">
-                  <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg">
-                    {attendanceRecords.filter(r => r.status === 'Présent').length} présents
-                  </span>
-                  <span className="px-2 py-1 bg-red-50 text-red-700 rounded-lg">
-                    {attendanceRecords.filter(r => r.status === 'Absent').length} absents
-                  </span>
-                  <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded-lg">
-                    ⏰ {attendanceRecords.filter(r => r.status === 'Retard').length} retards
-                  </span>
-                </div>
-              </div>
-              {isLoadingAttendance ? (
-                <div className="flex justify-center py-12"><div className="animate-spin h-8 w-8 border-2 border-[var(--color-primary)] border-t-transparent rounded-full" /></div>
-              ) : attendanceRecords.length === 0 ? (
-                <div className="py-16 text-center">
-                  <p className="text-slate-400 font-medium">Aucun employé affecté à ce chantier</p>
-                  <p className="text-xs text-slate-300 mt-1">Assignez d'abord des collaborateurs via l'onglet Personnel</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-slate-50">
-                      <tr>
-                        {['Employé', 'Matricule', 'Poste', 'Statut', 'Arrivée', 'Départ', 'Note'].map(h => (
-                          <th key={h} className="px-5 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {attendanceRecords.map((rec, idx) => {
-                        const isAbsent = rec.status === 'Absent';
-                        const isLate = rec.status === 'Retard';
-                        return (
-                          <tr key={rec.employeeId} className={`hover:bg-slate-50 transition-colors ${isAbsent ? 'bg-red-50/30' : isLate ? 'bg-amber-50/30' : ''}`}>
-                            <td className="px-5 py-3">
-                              <div className="flex items-center gap-2">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white ${isAbsent ? 'bg-red-400' : isLate ? 'bg-amber-400' : 'bg-emerald-400'}`}>
-                                  {rec.name?.charAt(0).toUpperCase()}
-                                </div>
-                                <span className="font-bold text-sm text-slate-900">{rec.name}</span>
-                              </div>
-                            </td>
-                            <td className="px-5 py-3 text-xs font-mono text-slate-500">{rec.matricule}</td>
-                            <td className="px-5 py-3 text-xs text-slate-600">{rec.role}</td>
-                            <td className="px-5 py-3">
-                              <select value={rec.status}
-                                onChange={e => {
-                                  const updated = [...attendanceRecords];
-                                  updated[idx] = { ...updated[idx], status: e.target.value };
-                                  if (e.target.value === 'Absent') {
-                                    updated[idx].arrivalTime = '';
-                                    updated[idx].departureTime = '';
-                                  }
-                                  setAttendanceRecords(updated);
-                                }}
-                                className={`text-xs font-black px-2 py-1 rounded-lg border outline-none cursor-pointer ${isAbsent ? 'bg-red-50 border-red-200 text-red-700' : isLate ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
-                                <option value="Présent"> Présent</option>
-                                <option value="Absent"> Absent</option>
-                                <option value="Retard">⏰ Retard</option>
-                                <option value="Demi-journée">½ Demi-journée</option>
-                              </select>
-                            </td>
-                            <td className="px-5 py-3">
-                              <input type="time" value={rec.arrivalTime || ''} disabled={isAbsent}
-                                onChange={e => {
-                                  const updated = [...attendanceRecords];
-                                  updated[idx] = { ...updated[idx], arrivalTime: e.target.value };
-                                  // Calculer retard auto (heure standard 07h30)
-                                  const [h, m] = e.target.value.split(':').map(Number);
-                                  if ((h * 60 + m) > 7 * 60 + 30) updated[idx].status = 'Retard';
-                                  else if (updated[idx].status === 'Retard') updated[idx].status = 'Présent';
-                                  setAttendanceRecords(updated);
-                                }}
-                                className="text-xs border border-slate-200 rounded-lg px-2 py-1 w-24 disabled:opacity-30 focus:ring-1 focus:ring-[var(--color-primary)] outline-none" />
-                            </td>
-                            <td className="px-5 py-3">
-                              <input type="time" value={rec.departureTime || ''} disabled={isAbsent}
-                                onChange={e => {
-                                  const updated = [...attendanceRecords];
-                                  updated[idx] = { ...updated[idx], departureTime: e.target.value };
-                                  setAttendanceRecords(updated);
-                                }}
-                                className="text-xs border border-slate-200 rounded-lg px-2 py-1 w-24 disabled:opacity-30 focus:ring-1 focus:ring-[var(--color-primary)] outline-none" />
-                            </td>
-                            <td className="px-5 py-3">
-                              <input type="text" value={rec.note || ''} placeholder="Motif..."
-                                onChange={e => {
-                                  const updated = [...attendanceRecords];
-                                  updated[idx] = { ...updated[idx], note: e.target.value };
-                                  setAttendanceRecords(updated);
-                                }}
-                                className="text-xs border border-slate-200 rounded-lg px-2 py-1 w-32 focus:ring-1 focus:ring-[var(--color-primary)] outline-none" />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+            <div className="flex flex-wrap items-center gap-3">
+              {role !== 'technicien' && (
+                <div className="flex items-center gap-2">
+                  <Filter className="w-3 h-3 text-slate-400" />
+                  <select
+                    value={attendanceProjectId}
+                    onChange={(e) => setAttendanceProjectId(Number(e.target.value))}
+                    className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-transparent outline-none cursor-pointer hover:text-[var(--color-primary)] transition-colors"
+                  >
+                    <option value={0}>— Sélectionner un chantier —</option>
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
                 </div>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadAttendance}
+                className="font-bold"
+              >
+                <History className="w-4 h-4 mr-2" /> Actualiser
+              </Button>
             </div>
-          )}
+          </div>
 
-          {/* Historique des pointages */}
-          {attendanceHistory.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-              <div className="p-5 border-b border-slate-100">
-                <h3 className="font-black text-slate-900">Historique — {attendanceDate}</h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50">
+          <Card className="border-none shadow-xl shadow-slate-200/50 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50 border-b border-slate-100">
+                  <tr className="text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                    <th className="px-6 py-4">Date</th>
+                    {role !== 'technicien' && <th className="px-6 py-4">Employé</th>}
+                    <th className="px-6 py-4">Statut</th>
+                    <th className="px-6 py-4">Arrivée</th>
+                    <th className="px-6 py-4">Départ</th>
+                    <th className="px-6 py-4">Retard</th>
+                    <th className="px-6 py-4">Chantier</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {isLoadingAttendance ? (
                     <tr>
-                      {['Employé', 'Statut', 'Arrivée', 'Départ', 'Retard', 'Note'].map(h => (
-                        <th key={h} className="px-5 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-widest">{h}</th>
-                      ))}
+                      <td colSpan={7} className="px-6 py-12 text-center">
+                        <div className="animate-spin h-6 w-6 border-2 border-[var(--color-primary)] border-t-transparent rounded-full mx-auto" />
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {attendanceHistory.map((rec: any) => (
-                      <tr key={rec.id} className="hover:bg-slate-50">
-                        <td className="px-5 py-3 font-bold text-sm text-slate-900">{rec.employee?.name || `Emp #${rec.employeeId}`}</td>
-                        <td className="px-5 py-3">
-                          <span className={`text-xs font-black px-2 py-1 rounded-full ${rec.status === 'Présent' ? 'bg-emerald-100 text-emerald-700' : rec.status === 'Absent' ? 'bg-red-100 text-red-700' : rec.status === 'Retard' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
-                            {rec.status}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3 text-sm font-mono">{rec.arrivalTime || '—'}</td>
-                        <td className="px-5 py-3 text-sm font-mono">{rec.departureTime || '—'}</td>
-                        <td className="px-5 py-3">
-                          {rec.lateMinutes > 0 ? (
-                            <span className="text-xs font-bold text-amber-600">+{rec.lateMinutes} min</span>
-                          ) : <span className="text-slate-300 text-xs">—</span>}
-                        </td>
-                        <td className="px-5 py-3 text-xs text-slate-500">{rec.note || '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ) : attendanceHistory.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center text-slate-400 font-bold">
+                        Choisissez un chantier
+                      </td>
+                    </tr>
+                  ) : (
+                    attendanceHistory
+                      .filter(rec => {
+                        if (role === 'technicien') {
+                          const me = employees.find(e => e.matricule === profile?.matricule) ||
+                            employees.find(e => e.name === profile?.name);
+                          return Number(rec.employeeId) === Number(me?.id);
+                        }
+                        return true;
+                      })
+                      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                      .map((rec: any) => (
+                        <tr key={rec.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-6 py-4 text-xs font-black text-slate-900">
+                            {new Date(rec.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </td>
+                          {role !== 'technicien' && (
+                            <td className="px-6 py-4">
+                              <p className="text-xs font-bold text-slate-900">{rec.employee?.name || `ID: ${rec.employeeId}`}</p>
+                            </td>
+                          )}
+                          <td className="px-6 py-4">
+                            <span className={cn(
+                              "text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md",
+                              rec.status === 'Présent' ? "bg-emerald-100 text-emerald-700" :
+                                rec.status === 'Retard' ? "bg-amber-100 text-amber-700" :
+                                  "bg-red-100 text-red-700"
+                            )}>
+                              {rec.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-xs font-mono font-bold text-slate-600">{rec.arrivalTime || '—'}</td>
+                          <td className="px-6 py-4 text-xs font-mono font-bold text-slate-600">{rec.departureTime || '—'}</td>
+                          <td className="px-6 py-4 text-xs">
+                            {rec.lateMinutes > 0 ? (
+                              <span className="font-bold text-amber-600">+{rec.lateMinutes} min</span>
+                            ) : <span className="text-slate-300">—</span>}
+                          </td>
+                          <td className="px-6 py-4 text-xs font-bold text-slate-400">
+                            {getProjectNameById(rec.projectId)}
+                          </td>
+                        </tr>
+                      ))
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
+          </Card>
         </div>
       )}
 
       {/* === ONGLET POINTAGE === */}
-      {activeTab === 'pointage' && (
-        <div className="space-y-6">
-          {/* Header pointage */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-xl font-black text-slate-900">Pointage du Personnel</h3>
-              <p className="text-sm text-slate-500 mt-1">Enregistrez les heures d'arrivée et de départ de votre équipe</p>
-            </div>
-            <div className="flex gap-3 flex-wrap items-center">
-              <select
-                value={attendanceProjectId}
-                onChange={e => setAttendanceProjectId(Number(e.target.value))}
-                className="border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold bg-white focus:ring-2 focus:ring-[var(--color-primary)] outline-none">
-                <option value={0}>— Sélectionner un chantier —</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-              <input type="date" value={attendanceDate}
-                onChange={e => setAttendanceDate(e.target.value)}
-                className="border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold bg-white" />
-            </div>
-          </div>
-
-          {!attendanceProjectId ? (
-            <div className="text-center py-16 bg-slate-50 rounded-2xl border border-slate-200">
-              <Clock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="font-bold text-slate-400">Sélectionnez un chantier pour commencer le pointage</p>
-            </div>
-          ) : isLoadingAttendance ? (
-            <div className="flex justify-center py-16"><div className="animate-spin h-8 w-8 border-2 border-[var(--color-primary)] border-t-transparent rounded-full" /></div>
-          ) : attendanceRecords.length === 0 ? (
-            <div className="text-center py-16 bg-slate-50 rounded-2xl border border-slate-200">
-              <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="font-bold text-slate-400">Aucun employé affecté à ce chantier</p>
-              <p className="text-sm text-slate-400 mt-1">Affectez des employés dans l'onglet Personnel</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Légende */}
-              <div className="flex gap-4 text-xs font-bold flex-wrap">
-                {[
-                  { status: 'Présent', color: 'bg-emerald-100 text-emerald-700' },
-                  { status: 'Retard', color: 'bg-amber-100 text-amber-700' },
-                  { status: 'Absent', color: 'bg-red-100 text-red-700' },
-                  { status: 'Demi-journée', color: 'bg-blue-100 text-blue-700' },
-                ].map(l => (
-                  <span key={l.status} className={`px-3 py-1 rounded-full ${l.color}`}>{l.status}</span>
-                ))}
-                <span className="text-slate-400 ml-2">Heure standard : 07h30</span>
-              </div>
-
-              {/* Tableau de pointage */}
-              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-slate-50 border-b border-slate-200">
-                    <tr>
-                      {['Employé', 'Matricule', 'Rôle', 'Arrivée', 'Départ', 'Statut', 'Note'].map(h => (
-                        <th key={h} className="px-4 py-3 text-left text-xs font-black text-slate-500 uppercase tracking-widest">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {attendanceRecords.map((rec, i) => {
-                      const isLate = rec.arrivalTime && rec.status !== 'Absent' && rec.arrivalTime > '07:30';
-                      return (
-                        <tr key={rec.employeeId} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-4 py-3">
-                            <p className="font-bold text-sm text-slate-900">{rec.name}</p>
-                          </td>
-                          <td className="px-4 py-3 text-xs font-mono text-slate-500">{rec.matricule}</td>
-                          <td className="px-4 py-3 text-xs text-slate-500">{rec.role}</td>
-                          <td className="px-4 py-3">
-                            <input
-                              type="time"
-                              value={rec.arrivalTime}
-                              disabled={rec.status === 'Absent'}
-                              onChange={e => {
-                                const updated = [...attendanceRecords];
-                                updated[i] = { ...updated[i], arrivalTime: e.target.value };
-                                if (e.target.value > '07:30') updated[i].status = 'Retard';
-                                else if (updated[i].status === 'Retard') updated[i].status = 'Présent';
-                                setAttendanceRecords(updated);
-                              }}
-                              className="border border-slate-200 rounded-lg px-2 py-1 text-sm w-28 disabled:opacity-40 disabled:bg-slate-100" />
-                          </td>
-                          <td className="px-4 py-3">
-                            <input
-                              type="time"
-                              value={rec.departureTime}
-                              disabled={rec.status === 'Absent'}
-                              onChange={e => {
-                                const updated = [...attendanceRecords];
-                                updated[i] = { ...updated[i], departureTime: e.target.value };
-                                setAttendanceRecords(updated);
-                              }}
-                              className="border border-slate-200 rounded-lg px-2 py-1 text-sm w-28 disabled:opacity-40 disabled:bg-slate-100" />
-                          </td>
-                          <td className="px-4 py-3">
-                            <select
-                              value={rec.status}
-                              onChange={e => {
-                                const updated = [...attendanceRecords];
-                                updated[i] = { ...updated[i], status: e.target.value };
-                                if (e.target.value === 'Absent') {
-                                  updated[i].arrivalTime = '';
-                                  updated[i].departureTime = '';
-                                }
-                                setAttendanceRecords(updated);
-                              }}
-                              className={`text-xs font-bold px-2 py-1.5 rounded-lg border outline-none cursor-pointer ${rec.status === 'Présent' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                rec.status === 'Retard' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                  rec.status === 'Absent' ? 'bg-red-50 text-red-700 border-red-200' :
-                                    'bg-blue-50 text-blue-700 border-blue-200'
-                                }`}>
-                              <option value="Présent">Présent</option>
-                              <option value="Retard">Retard</option>
-                              <option value="Absent">Absent</option>
-                              <option value="Demi-journée">Demi-journée</option>
-                            </select>
-                          </td>
-                          <td className="px-4 py-3">
-                            <input
-                              type="text"
-                              value={rec.note}
-                              placeholder="Observation..."
-                              onChange={e => {
-                                const updated = [...attendanceRecords];
-                                updated[i] = { ...updated[i], note: e.target.value };
-                                setAttendanceRecords(updated);
-                              }}
-                              className="border border-slate-200 rounded-lg px-2 py-1 text-xs w-32 focus:ring-1 focus:ring-[var(--color-primary)] outline-none" />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Bouton sauvegarder */}
-              <div className="flex justify-between items-center">
-                <div className="text-sm text-slate-500 space-x-4">
-                  <span>Présents : <strong className="text-emerald-600">{attendanceRecords.filter(r => r.status === 'Présent' || r.status === 'Demi-journée').length}</strong></span>
-                  <span>Retards : <strong className="text-amber-600">{attendanceRecords.filter(r => r.status === 'Retard').length}</strong></span>
-                  <span>Absents : <strong className="text-red-600">{attendanceRecords.filter(r => r.status === 'Absent').length}</strong></span>
-                </div>
-                <button
-                  onClick={handleSubmitAttendance}
-                  disabled={isSubmittingAttendance}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-[var(--color-primary)] text-white font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50">
-                  {isSubmittingAttendance && <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />}
-                  Enregistrer le pointage
-                </button>
-              </div>
-
-              {/* Historique */}
-              {attendanceHistory.length > 0 && (
-                <div className="mt-6">
-                  <h4 className="font-black text-slate-900 mb-3">Historique récent</h4>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {attendanceHistory.slice(0, 20).map((rec: any) => (
-                      <div key={rec.id} className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-100 hover:border-slate-200 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <span className={`text-xs font-black px-2 py-0.5 rounded-full ${rec.status === 'Présent' ? 'bg-emerald-100 text-emerald-700' :
-                            rec.status === 'Retard' ? 'bg-amber-100 text-amber-700' :
-                              rec.status === 'Absent' ? 'bg-red-100 text-red-700' :
-                                'bg-blue-100 text-blue-700'
-                            }`}>{rec.status}</span>
-                          <div>
-                            <p className="text-sm font-bold text-slate-900">{rec.employee?.name || 'Employé'}</p>
-                            <p className="text-xs text-slate-400">{rec.employee?.matricule} · {rec.date}</p>
-                          </div>
-                        </div>
-                        <div className="text-right text-xs text-slate-500">
-                          {rec.arrivalTime && <p>Arrivée : <strong>{rec.arrivalTime}</strong></p>}
-                          {rec.departureTime && <p>Départ : <strong>{rec.departureTime}</strong></p>}
-                          {rec.lateMinutes > 0 && <p className="text-amber-600 font-bold">+{rec.lateMinutes} min retard</p>}
-                          {rec.note && <p className="text-slate-400 italic">{rec.note}</p>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
 
     </div>
   );

@@ -74,7 +74,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
       path
     }, ...prev]);
 
-    playSound(type);
+    // playSound(type); // Son désactivé
     
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id));

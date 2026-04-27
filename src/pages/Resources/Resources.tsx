@@ -20,7 +20,8 @@ import {
   UserPlus,
   ClipboardCheck,
   Settings2,
-  Trash2
+  Trash2,
+  CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -57,7 +58,8 @@ export const ResourcesPage = () => {
     subcontracts,
     addSubcontract,
     updateSubcontract,
-    deleteSubcontract
+    deleteSubcontract,
+    addTransaction
   } = useData();
 
   const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
@@ -77,6 +79,13 @@ export const ResourcesPage = () => {
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [stockStep, setStockStep] = useState(1);
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
+  const [isServiceProviderModalOpen, setIsServiceProviderModalOpen] = useState(false);
+  const [newServiceProvider, setNewServiceProvider] = useState({
+    name: '',
+    projectId: projects[0]?.id || 0,
+    tasks: [] as string[],
+    totalCost: '',
+  });
   const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
   const [selectedResource, setSelectedResource] = useState<any>(null);
   const [hrSearchQuery, setHrSearchQuery] = useState('');
@@ -103,6 +112,7 @@ export const ResourcesPage = () => {
   const [selectedStockProject, setSelectedStockProject] = useState<number | null>(null);
   const [selectedEquipmentProject, setSelectedEquipmentProject] = useState<number | null>(null);
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<number | null>(null);
+  const [stTab, setStTab] = useState<'contracts' | 'providers'>('contracts');
 
   const getProjectNameById = (projectId?: number) => projects.find(p => p.id === projectId)?.name || 'Chantier inconnu';
   const getProjectIdByName = (name?: string) => projects.find(p => p.name === name)?.id || 0;
@@ -742,6 +752,73 @@ export const ResourcesPage = () => {
       setSelectedContract({ ...contract, tasks: updatedTasks, progress });
     }
   };
+  
+  const handleServiceProviderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newServiceProvider.name || !newServiceProvider.projectId || !newServiceProvider.totalCost) {
+      notify('Le nom, le chantier et le coût total sont obligatoires', 'error');
+      return;
+    }
+
+    try {
+      await addSubcontract({
+        entreprise: newServiceProvider.name,
+        projectId: newServiceProvider.projectId,
+        montant: parseFloat(newServiceProvider.totalCost),
+        type: 'provider',
+        tasks: newServiceProvider.tasks.map(t => ({
+          title: t,
+          cost: 0,
+          lotNumber: 1,
+          lotName: 'Prestation'
+        }))
+      });
+
+      notify('Prestataire de service ajouté avec succès', 'success');
+      setIsServiceProviderModalOpen(false);
+      setNewServiceProvider({
+        name: '',
+        projectId: projects[0]?.id || 0,
+        tasks: [],
+        totalCost: '',
+      });
+    } catch (err: any) {
+      notify(err?.message || 'Erreur lors de l\'ajout du prestataire', 'error');
+    }
+  };
+
+  const handlePayProvider = async (provider: any) => {
+    if (provider.paymentStatus === 'Payé') return;
+    
+    if (window.confirm(`Confirmer le paiement de ${Number(provider.montant).toLocaleString()} FCFA à ${provider.company} ?`)) {
+      try {
+        // 1. Mettre à jour le statut du prestataire
+        await updateSubcontract(provider.id, { paymentStatus: 'Payé' });
+        
+        // 2. Enregistrer la dépense dans les finances
+        await addTransaction({
+          type: 'expense',
+          category: 'Main-d\'œuvre - Prestataire',
+          provider: provider.company,
+          projectId: provider.projectId,
+          amount: provider.montant,
+          description: `Paiement prestataire: ${provider.company}`,
+          status: 'Validé',
+          transactionDate: new Date().toISOString().split('T')[0]
+        });
+
+        notify(`Paiement de ${provider.company} enregistré avec succès`, 'success');
+        addLog({
+          module: 'Resources',
+          action: `Paiement prestataire: ${provider.company} (${Number(provider.montant).toLocaleString()} FCFA)`,
+          user: name || 'Chef Chantier',
+          type: 'success'
+        });
+      } catch (err: any) {
+        notify(err?.message || 'Erreur lors du paiement', 'error');
+      }
+    }
+  };
 
   const handleStockMovementSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1112,7 +1189,7 @@ export const ResourcesPage = () => {
                     .filter(m => selectedStockProject === null || m.projectId === selectedStockProject)
                     .slice(0, 5).map((movement, i) => (
                       <div key={`movement-${i}`} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <div className="flex items-center gap-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                           <div className={cn(
                             "w-10 h-10 rounded-xl flex items-center justify-center",
                             movement.type === 'Sortie' ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-500"
@@ -1340,92 +1417,237 @@ export const ResourcesPage = () => {
                   </table>
                 </div>
               </Card>
+
             </div>
           )}
 
           {activeTab === 'subcontracting' && (
             <div className="space-y-8">
-              <div className="flex justify-between items-center">
-                <h3 className="text-xl font-black text-slate-900 tracking-tight">Gestion de la Sous-traitance</h3>
-                <Button onClick={() => {
-                  setEditingContract(null);
-                  setNewSubcontract({
-                    company: '',
-                    niu: '',
-                    projectId: projects[0]?.id || 0,
-                    task: '',
-                    amount: '',
-                    startDate: '',
-                    endDate: '',
-                    tasks: [],
-                    lots: []
-                  });
-                  setIsSubcontractModalOpen(true);
-                }} className="font-bold">
-                  <Plus className="w-4 h-4 mr-2" /> Nouveau Contrat ST
-                </Button>
-              </div>
-              <div className="grid grid-cols-1 gap-6">
-                {subcontracts.map((st, i) => (
-                  <Card key={`subcontract-${i}`} className="p-6 border-none shadow-lg shadow-slate-200/50 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="flex items-center gap-6">
-                      <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400">
-                        <Handshake className="w-7 h-7" />
-                      </div>
-                      <div>
-                        <h4 className="text-lg font-black text-slate-900">{st.entreprise}</h4>
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{st.objet} • {getProjectNameById(st.projectId)}</p>
-                      </div>
-                    </div>
-                    <div className="flex-1 max-w-xs">
-                      <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase mb-1">
-                        <span>Avancement ST</span>
-                        <span>{st.progress}%</span>
-                      </div>
-                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-[var(--color-primary)] rounded-full" style={{ width: `${st.progress}%` }}></div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs font-bold text-slate-400 uppercase">Montant Contrat</p>
-                      <p className="text-lg font-black text-slate-900">{st.montant.toLocaleString()} FCFA</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" className="font-bold" onClick={() => {
-                        setSelectedContract(st);
-                        setIsContractDetailsModalOpen(true);
-                      }}>Détails</Button>
-                      <Button variant="ghost" size="sm" className="font-bold text-blue-600 hover:bg-blue-50" onClick={() => {
-                        const reconstructedLots: { lotNumber: number; lotName: string; tasks: string[] }[] = [];
-                        (st.tasks || []).forEach((t: any) => {
-                          const lotNum = t.lotNumber || 1;
-                          let lot = reconstructedLots.find(l => l.lotNumber === lotNum);
-                          if (!lot) {
-                            lot = { lotNumber: lotNum, lotName: t.lotName || `Lot ${lotNum}`, tasks: [] };
-                            reconstructedLots.push(lot);
-                          }
-                          lot.tasks.push(t.title);
-                        });
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div>
+                  <h3 className="text-2xl font-black text-slate-900 tracking-tight">Sous-traitance & Partenaires</h3>
+                  <div className="flex gap-1 mt-3 p-1 bg-slate-100 rounded-xl w-fit">
+                    <button
+                      onClick={() => setStTab('contracts')}
+                      className={cn(
+                        "px-4 py-2 rounded-lg text-xs font-bold transition-all",
+                        stTab === 'contracts' ? "bg-white shadow-sm text-blue-600" : "text-slate-500 hover:text-slate-700"
+                      )}
+                    >
+                      Contrats de Sous-traitance
+                    </button>
+                    <button
+                      onClick={() => setStTab('providers')}
+                      className={cn(
+                        "px-4 py-2 rounded-lg text-xs font-bold transition-all",
+                        stTab === 'providers' ? "bg-white shadow-sm text-blue-600" : "text-slate-500 hover:text-slate-700"
+                      )}
+                    >
+                      Prestataires de Services
+                    </button>
+                  </div>
+                </div>
 
-                        setEditingContract(st);
-                        setNewSubcontract({
-                          company: st.entreprise,
-                          niu: 'M098765432109',
-                          projectId: st.projectId,
-                          task: st.objet,
-                          amount: st.montant.toString(),
-                          startDate: st.startDate || '',
-                          endDate: st.endDate || '',
-                          tasks: st.tasks.map((t: any) => t.title),
-                          lots: reconstructedLots
-                        });
-                        setUseLots(reconstructedLots.length > 1 || st.tasks.some((t: any) => t.lotNumber > 1 || (t.lotName && t.lotName !== 'Lot 1')));
-                        setIsSubcontractModalOpen(true);
-                      }}>Modifier</Button>
+                {stTab === 'contracts' ? (
+                  <Button onClick={() => {
+                    setEditingContract(null);
+                    setNewSubcontract({
+                      company: '',
+                      niu: '',
+                      projectId: projects[0]?.id || 0,
+                      task: '',
+                      amount: '',
+                      startDate: '',
+                      endDate: '',
+                      tasks: [],
+                      lots: []
+                    });
+                    setIsSubcontractModalOpen(true);
+                  }} className="font-bold shadow-lg shadow-blue-900/10">
+                    <Plus className="w-4 h-4 mr-2" /> Nouveau Contrat ST
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={() => setIsServiceProviderModalOpen(true)}
+                    className="font-bold shadow-lg shadow-blue-900/10"
+                  >
+                    <Plus className="w-4 h-4 mr-2" /> Ajouter un Prestataire
+                  </Button>
+                )}
+              </div>
+
+              {stTab === 'contracts' ? (
+                <div className="grid grid-cols-1 gap-6 animate-in fade-in duration-300">
+                  {subcontracts.filter(st => st.type === 'subcontract').length === 0 ? (
+                    <Card className="p-12 flex flex-col items-center justify-center text-center border-dashed border-2">
+                      <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 mb-4">
+                        <Handshake className="w-8 h-8" />
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-900">Aucun contrat de sous-traitance</h4>
+                      <p className="text-xs text-slate-400 mt-1">Les contrats avec lots et tâches complexes s'affichent ici.</p>
+                    </Card>
+                  ) : (
+                    subcontracts.filter(st => st.type === 'subcontract').map((st, i) => (
+                      <Card key={`subcontract-${i}`} className="p-6 border-none shadow-lg shadow-slate-200/50 flex flex-col md:flex-row md:items-center justify-between gap-6 group hover:shadow-xl transition-all">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-6">
+                          <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-500 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                            <Handshake className="w-7 h-7" />
+                          </div>
+                          <div>
+                            <h4 className="text-lg font-black text-slate-900">{st.entreprise}</h4>
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{st.objet} • {getProjectNameById(st.projectId)}</p>
+                          </div>
+                        </div>
+                        <div className="flex-1 max-w-xs">
+                          <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase mb-1">
+                            <span>Avancement</span>
+                            <span>{st.progress}%</span>
+                          </div>
+                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${st.progress}%` }}></div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">Montant Global</p>
+                          <p className="text-lg font-black text-slate-900">{st.montant.toLocaleString()} FCFA</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" className="font-bold rounded-xl" onClick={() => {
+                            setSelectedContract(st);
+                            setIsContractDetailsModalOpen(true);
+                          }}>Détails</Button>
+                          <Button variant="ghost" size="sm" className="font-bold text-blue-600 hover:bg-blue-50 rounded-xl" onClick={() => {
+                            const reconstructedLots: { lotNumber: number; lotName: string; tasks: string[] }[] = [];
+                            (st.tasks || []).forEach((t: any) => {
+                              const lotNum = t.lotNumber || 1;
+                              let lot = reconstructedLots.find(l => l.lotNumber === lotNum);
+                              if (!lot) {
+                                lot = { lotNumber: lotNum, lotName: t.lotName || `Lot ${lotNum}`, tasks: [] };
+                                reconstructedLots.push(lot);
+                              }
+                              lot.tasks.push(t.title);
+                            });
+
+                            setEditingContract(st);
+                            setNewSubcontract({
+                              company: st.entreprise,
+                              niu: 'M098765432109',
+                              projectId: st.projectId,
+                              task: st.objet,
+                              amount: st.montant.toString(),
+                              startDate: st.startDate || '',
+                              endDate: st.endDate || '',
+                              tasks: st.tasks.map((t: any) => t.title),
+                              lots: reconstructedLots
+                            });
+                            setUseLots(reconstructedLots.length > 1 || st.tasks.some((t: any) => t.lotNumber > 1 || (t.lotName && t.lotName !== 'Lot 1')));
+                            setIsSubcontractModalOpen(true);
+                          }}>Modifier</Button>
+                        </div>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  <Card className="overflow-hidden border-none shadow-xl shadow-slate-200/50">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="text-left text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 bg-slate-50/50">
+                            <th className="px-6 py-4 text-center w-16">#</th>
+                            <th className="px-6 py-4">Prestataire / Partenaire</th>
+                            <th className="px-6 py-4">Chantier</th>
+                            <th className="px-6 py-4">Prestations</th>
+                            <th className="px-6 py-4">État Paiement</th>
+                            <th className="px-6 py-4 text-right">Montant</th>
+                            <th className="px-6 py-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {subcontracts.filter(s => s.type === 'provider').length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="px-6 py-16 text-center">
+                                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 mx-auto mb-4">
+                                  <Users className="w-8 h-8" />
+                                </div>
+                                <p className="text-sm font-bold text-slate-400">Aucun prestataire de service enregistré</p>
+                                <p className="text-[10px] text-slate-300 mt-1 uppercase tracking-widest">Utilisez le bouton ajouter pour commencer</p>
+                              </td>
+                            </tr>
+                          ) : (
+                            subcontracts.filter(s => s.type === 'provider').map((provider, idx) => (
+                              <tr key={provider.id} className="hover:bg-slate-50/80 transition-colors group">
+                                <td className="px-6 py-4 text-center">
+                                  <span className="text-[10px] font-black text-slate-300">{idx + 1}</span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center text-blue-500 font-black text-[10px]">
+                                      {provider.company.substring(0, 2).toUpperCase()}
+                                    </div>
+                                    <span className="text-xs font-black text-slate-900">{provider.company}</span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-2">
+                                    <MapPin className="w-3 h-3 text-slate-400" />
+                                    <span className="text-[10px] font-bold text-slate-600">{getProjectNameById(provider.projectId)}</span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex flex-wrap gap-1">
+                                    {provider.tasks.map((t: any, i: number) => (
+                                      <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-bold rounded-md border border-slate-200">
+                                        {t.title}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className={cn(
+                                    "px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-full border flex items-center gap-1.5 w-fit",
+                                    provider.paymentStatus === 'Payé' 
+                                      ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
+                                      : "bg-amber-50 text-amber-600 border-amber-100"
+                                  )}>
+                                    <span className={cn("w-1.5 h-1.5 rounded-full", provider.paymentStatus === 'Payé' ? "bg-emerald-500" : "bg-amber-500")} />
+                                    {provider.paymentStatus || 'En attente'}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <span className="text-sm font-black text-slate-900">{Number(provider.montant).toLocaleString()} <span className="text-[10px] text-slate-400 ml-1">FCFA</span></span>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handlePayProvider(provider)}
+                                    disabled={provider.paymentStatus === 'Payé'}
+                                    className={cn(
+                                      "h-8 px-4 text-[10px] font-black uppercase tracking-widest gap-2 transition-all rounded-xl",
+                                      provider.paymentStatus === 'Payé'
+                                        ? "bg-slate-100 text-slate-400 border-none opacity-50"
+                                        : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-900/20"
+                                    )}
+                                  >
+                                    {provider.paymentStatus === 'Payé' ? (
+                                      <>Payé</>
+                                    ) : (
+                                      <>
+                                        <CheckCircle2 className="w-3.5 h-3.5" /> Valider Paiement
+                                      </>
+                                    )}
+                                  </Button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
                     </div>
                   </Card>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
           )}
         </motion.div>
@@ -1439,7 +1661,7 @@ export const ResourcesPage = () => {
       >
         <div className="space-y-6">
           <p className="text-sm text-slate-600">Êtes-vous sûr de vouloir changer le statut de la commande {purchaseToUpdate?.item} en "Livré" ? Cette action est irréversible.</p>
-          <div className="flex justify-end gap-3">
+          <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
             <Button variant="outline" onClick={() => setIsConfirmModalOpen(false)}>Annuler</Button>
             <Button onClick={() => {
               updatePurchase(purchaseToUpdate.id, { status: 'Livré' });
@@ -1490,7 +1712,7 @@ export const ResourcesPage = () => {
                       ))}
                     </select>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Input
                       label="Quantité"
                       type="number"
@@ -1649,7 +1871,7 @@ export const ResourcesPage = () => {
                     <option>EPI (Stock: 120 kits)</option>
                   </select>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input
                     label="Quantité Sortie"
                     type="number" min="0"
@@ -1791,7 +2013,17 @@ export const ResourcesPage = () => {
             </div>
           </div>
 
-          <div className="pt-6 border-t border-slate-100 flex justify-end">
+            <div className="pt-6 border-t border-slate-100 flex justify-between items-center">
+            <Button 
+              variant="ghost" 
+              onClick={() => {
+                setIsEmployeeModalOpen(false);
+                setIsServiceProviderModalOpen(true);
+              }} 
+              className="text-xs font-bold text-blue-600 hover:bg-blue-50"
+            >
+              Ajouter un prestataire
+            </Button>
             <Button variant="outline" onClick={() => setIsEmployeeModalOpen(false)} className="font-bold">
               Fermer
             </Button>
@@ -1799,6 +2031,147 @@ export const ResourcesPage = () => {
         </div>
       </Modal>
 
+      <Modal
+        isOpen={isServiceProviderModalOpen}
+        onClose={() => setIsServiceProviderModalOpen(false)}
+        title="Nouveau Prestataire de Service"
+        size="lg"
+      >
+        <form onSubmit={handleServiceProviderSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Identité & Chantier</label>
+                <div className="p-5 bg-white border-2 border-slate-100 rounded-3xl space-y-4 shadow-sm">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Nom du prestataire</label>
+                    <Input
+                      placeholder="Ex: SARL Construction Plus"
+                      value={newServiceProvider.name}
+                      onChange={(e) => setNewServiceProvider({ ...newServiceProvider, name: e.target.value })}
+                      className="h-12 px-4 rounded-xl border-slate-200 font-bold text-sm focus:border-blue-500 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Chantier d'affectation</label>
+                    <select
+                      value={newServiceProvider.projectId}
+                      onChange={(e) => setNewServiceProvider({ ...newServiceProvider, projectId: Number(e.target.value) })}
+                      className="w-full h-12 px-4 bg-slate-50 border-2 border-transparent rounded-xl text-sm font-bold outline-none focus:bg-white focus:border-blue-500 transition-all"
+                    >
+                      <option value={0}>Sélectionner un chantier</option>
+                      {projects.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Conditions Financières</label>
+                <div className="p-5 bg-blue-50/50 border-2 border-blue-100/50 rounded-3xl space-y-1.5">
+                  <label className="text-[9px] font-bold text-blue-600 uppercase ml-1">Coût total de la prestation (HT)</label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      placeholder="0.00"
+                      value={newServiceProvider.totalCost}
+                      onChange={(e) => setNewServiceProvider({ ...newServiceProvider, totalCost: e.target.value })}
+                      className="h-14 pl-5 pr-14 rounded-2xl border-blue-200 bg-white font-black text-xl text-blue-700 focus:ring-4 focus:ring-blue-100 transition-all"
+                    />
+                    <div className="absolute right-5 top-1/2 -translate-y-1/2 font-black text-blue-300 text-sm">FCFA</div>
+                  </div>
+                  <p className="text-[10px] text-blue-500/70 font-medium ml-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> Ce montant sera facturé pour l'ensemble des tâches.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex justify-between items-end mb-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Tâches à effectuer</label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setNewServiceProvider({
+                    ...newServiceProvider,
+                    tasks: [...newServiceProvider.tasks, '']
+                  })}
+                  className="h-8 px-3 text-[10px] uppercase font-black text-blue-600 hover:bg-blue-50 rounded-lg"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1.5" /> Ajouter une tâche
+                </Button>
+              </div>
+              
+              <div className="p-5 bg-slate-50 border-2 border-slate-100 rounded-3xl space-y-3 min-h-[320px] max-h-[400px] overflow-y-auto">
+                {newServiceProvider.tasks.map((task, idx) => (
+                  <div key={idx} className="flex gap-2 group animate-in slide-in-from-right-2 duration-200">
+                    <div className="flex-1 relative">
+                      <Input
+                        placeholder={`Tâche #${idx + 1}`}
+                        value={task}
+                        onChange={(e) => {
+                          const updated = [...newServiceProvider.tasks];
+                          updated[idx] = e.target.value;
+                          setNewServiceProvider({ ...newServiceProvider, tasks: updated });
+                        }}
+                        className="h-11 pl-4 pr-10 rounded-xl border-slate-200 bg-white font-bold text-xs focus:border-blue-500 transition-all"
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 bg-slate-100 rounded-md flex items-center justify-center text-[10px] font-black text-slate-400">
+                        {idx + 1}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const updated = newServiceProvider.tasks.filter((_, i) => i !== idx);
+                        setNewServiceProvider({ ...newServiceProvider, tasks: updated });
+                      }}
+                      className="h-11 w-11 p-0 rounded-xl text-red-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+                
+                {newServiceProvider.tasks.length === 0 && (
+                  <div className="h-full flex flex-col items-center justify-center py-12 text-center space-y-3">
+                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-slate-100">
+                      <ClipboardCheck className="w-6 h-6 text-slate-300" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 font-black uppercase tracking-tight">Liste des tâches vide</p>
+                      <p className="text-[10px] text-slate-400 font-medium">Décrivez les travaux que le prestataire doit réaliser.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-8 border-t border-slate-100 flex justify-end gap-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setIsServiceProviderModalOpen(false)} 
+              className="px-6 h-12 font-bold text-slate-500 border-slate-200 rounded-xl hover:bg-slate-50"
+            >
+              Annuler
+            </Button>
+            <Button 
+              type="submit" 
+              className="px-10 h-12 font-black uppercase tracking-[0.15em] text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xl shadow-blue-200 transition-all active:scale-95"
+            >
+              Enregistrer le prestataire
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Equipment Request Modal */}
       <Modal
@@ -1960,7 +2333,7 @@ export const ResourcesPage = () => {
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-slate-700">Type de Mouvement</label>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     <button
                       type="button"
                       onClick={() => setStockMovementType('entry')}
@@ -2017,7 +2390,7 @@ export const ResourcesPage = () => {
                         <option>Fer à béton 12mm</option>
                       </select>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Input
                         label="Quantité"
                         type="number" min="0"
@@ -2149,7 +2522,7 @@ export const ResourcesPage = () => {
               <option>Ahmed Bello</option>
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="Date Début" type="date" min={today} required />
             <Input label="Date Fin Prévue" type="date" min={today} required />
           </div>
@@ -2212,7 +2585,7 @@ export const ResourcesPage = () => {
         size="lg"
       >
         <div className="space-y-8">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Heures Moteur</p>
               <p className="text-xl font-black text-slate-900">1,245 h</p>
@@ -2236,7 +2609,7 @@ export const ResourcesPage = () => {
                 { date: '08/04/2024', type: 'Affectation', detail: 'Transfert Section Edéa -> Section Boumnyebel', author: 'Logistique' },
               ].map((event, i) => (
                 <div key={i} className="p-4 bg-white border border-slate-100 rounded-2xl flex items-center justify-between">
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                     <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400">
                       <History className="w-5 h-5" />
                     </div>
@@ -2285,7 +2658,7 @@ export const ResourcesPage = () => {
         size="lg"
       >
         <form className="space-y-6" onSubmit={handleSubcontractSubmit}>
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="space-y-6">
               <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Informations ST</h4>
               <Input
@@ -2332,7 +2705,7 @@ export const ResourcesPage = () => {
                 value={newSubcontract.amount}
                 onChange={(e) => setNewSubcontract({ ...newSubcontract, amount: e.target.value })}
               />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
                   label="Date Début"
                   type="date" min={today}
@@ -2448,7 +2821,7 @@ export const ResourcesPage = () => {
                 Supprimer le contrat
               </Button>
             ) : <div />}
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <Button variant="outline" type="button" onClick={() => {
                 setIsSubcontractModalOpen(false);
                 setEditingContract(null);
@@ -2475,7 +2848,7 @@ export const ResourcesPage = () => {
         size="lg"
       >
         <div className="space-y-6">
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1 relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -2567,7 +2940,7 @@ export const ResourcesPage = () => {
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Lot / Tâche</p>
                 <p className="text-sm font-black text-slate-900">{selectedContract.objet}</p>
@@ -2691,7 +3064,7 @@ export const ResourcesPage = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Type de Contrat</p>
                 <p className="text-sm font-black text-slate-900">{selectedResource.contract || 'CDD'}</p>
@@ -2718,7 +3091,7 @@ export const ResourcesPage = () => {
               </div>
             </div>
 
-            <div className="pt-6 border-t border-slate-100 grid grid-cols-3 gap-3">
+            <div className="pt-6 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               <Button variant="outline" className="font-bold text-blue-600 border-blue-200 hover:bg-blue-50" onClick={() => { notify("Fonctionnalité à venir", "info"); setIsManageContractModalOpen(false); }}>Renouveler</Button>
               <Button variant="outline" className="font-bold text-amber-600 border-amber-200 hover:bg-amber-50" onClick={() => { notify("Fonctionnalité à venir", "info"); setIsManageContractModalOpen(false); }}>Suspendre</Button>
               <Button variant="outline" className="font-bold text-slate-600 border-slate-200 hover:bg-slate-50" onClick={() => { notify("Fonctionnalité à venir", "info"); setIsManageContractModalOpen(false); }}>Modifier</Button>
@@ -2748,7 +3121,7 @@ export const ResourcesPage = () => {
                 onChange={(e) => setLogbookFilters({ ...logbookFilters, date: e.target.value })}
               />
             </div>
-            <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Chantier concerné</label>
                 <select
@@ -2782,7 +3155,7 @@ export const ResourcesPage = () => {
           <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
             {getFilteredLogbook().map((log, i) => (
               <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                   <div className={cn(
                     "w-10 h-10 rounded-xl flex items-center justify-center",
                     log.type === 'Sortie' ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-500"
@@ -2869,7 +3242,7 @@ export const ResourcesPage = () => {
                       )}
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Quantité Constatée</label>
                       <input
@@ -3092,7 +3465,7 @@ const ResourceKpiCard = ({ title, value, icon: Icon, color }: any) => {
   };
   return (
     <Card className="p-6 border-none shadow-lg shadow-slate-200/50 hover:shadow-xl transition-all group">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <div className={cn("p-4 rounded-2xl transition-colors", colors[color as keyof typeof colors])}>
           <Icon className="w-6 h-6" />
         </div>

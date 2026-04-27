@@ -149,6 +149,10 @@ export const FinancesPage = () => {
       || (t.provider || t.client || '').toLowerCase().includes(q)
       || (t.category || '').toLowerCase().includes(q);
     return matchTab && matchProj && matchQ;
+  }).sort((a: any, b: any) => {
+    const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
+    if (dateDiff !== 0) return dateDiff;
+    return b.id - a.id;
   });
 
   // ── Loaders ──
@@ -593,7 +597,7 @@ export const FinancesPage = () => {
                         <tr><td colSpan={6} className="px-4 py-12 text-center text-sm text-slate-400">
                           Cliquez "Actualiser" pour charger
                         </td></tr>
-                      ) : (kpiData?.kpis || []).map((k: any) => (
+                      ) : [...(kpiData?.kpis || [])].sort((a: any, b: any) => b.id - a.id).map((k: any) => (
                         <tr key={k.id} className="hover:bg-slate-50 transition-colors">
                           <td className="px-4 py-3">
                             <p className="font-semibold text-sm text-slate-900 truncate max-w-[160px]">{k.name}</p>
@@ -703,7 +707,11 @@ export const FinancesPage = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {accounting.map((entry: any) => (
+                    {[...accounting].sort((a: any, b: any) => {
+                      const dateDiff = new Date(b.journalDate).getTime() - new Date(a.journalDate).getTime();
+                      if (dateDiff !== 0) return dateDiff;
+                      return b.id - a.id;
+                    }).map((entry: any) => (
                       <tr key={entry.id} className="hover:bg-slate-50">
                         <td className="px-4 py-3 text-sm text-slate-600 font-mono whitespace-nowrap">{entry.journalDate}</td>
                         <td className="px-4 py-3 text-sm text-slate-700 max-w-[120px] truncate">{entry.project?.name || '—'}</td>
@@ -766,7 +774,7 @@ export const FinancesPage = () => {
                 {projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-slate-700">Catégorie *</label>
                 <select value={newExpense.category}
@@ -778,7 +786,7 @@ export const FinancesPage = () => {
               <Input label="Fournisseur" value={newExpense.provider}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewExpense(p => ({ ...p, provider: e.target.value }))} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input label="Montant HT (FCFA) *" type="number" min="0" required value={newExpense.amount}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewExpense(p => ({ ...p, amount: e.target.value }))} />
               <Input label="Date *" type="date" min={today} required value={newExpense.date}
@@ -840,7 +848,7 @@ export const FinancesPage = () => {
           </div>
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-700">Type de facture *</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {[
                 { value: 'Situation Travaux', label: 'Situation Travaux', desc: 'Avancement en cours' },
                 { value: 'Honoraires Études', label: 'Honoraires Études', desc: 'Études et conception' },
@@ -855,13 +863,13 @@ export const FinancesPage = () => {
               ))}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Client *" required value={newInvoice.client} placeholder="MINTP, MINHDU…"
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewInvoice(p => ({ ...p, client: e.target.value }))} />
             <Input label="Montant HT (FCFA) *" type="number" min="0" required value={newInvoice.amount}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewInvoice(p => ({ ...p, amount: e.target.value }))} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Date d'échéance" type="date" min={today} value={newInvoice.dueDate}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewInvoice(p => ({ ...p, dueDate: e.target.value }))} />
             <Input label="Référence" value={newInvoice.description} placeholder="N° marché…"
@@ -904,13 +912,13 @@ export const FinancesPage = () => {
               {projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Client" value={newPayment.client}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPayment(p => ({ ...p, client: e.target.value }))} />
             <Input label="Montant (FCFA) *" type="number" min="0" required value={newPayment.amount}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPayment(p => ({ ...p, amount: e.target.value }))} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Date *" type="date" min={today} required value={newPayment.date}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPayment(p => ({ ...p, date: e.target.value }))} />
             <div className="space-y-1.5">
@@ -993,13 +1001,13 @@ export const FinancesPage = () => {
               <p className="text-sm text-amber-800 mt-0.5">Reste dû : <strong className="text-red-600">{fmt(Number(selectedDebt.amount) - Number(selectedDebt.debtAmountPaid || 0))} FCFA</strong></p>
             </div>
             <form onSubmit={handleRepaymentSubmit} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Input label="Montant (FCFA) *" type="number" min="0" required value={newRepayment.amount}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewRepayment(p => ({ ...p, amount: e.target.value }))} />
                 <Input label="Date *" type="date" min={today} required value={newRepayment.repaymentDate}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewRepayment(p => ({ ...p, repaymentDate: e.target.value }))} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-slate-700">Mode</label>
                   <select value={newRepayment.paymentMethod} onChange={e => setNewRepayment(p => ({ ...p, paymentMethod: e.target.value }))}

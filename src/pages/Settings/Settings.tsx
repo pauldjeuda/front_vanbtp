@@ -315,7 +315,7 @@ export const SettingsPage = () => {
                   <h3 className="text-lg font-bold text-slate-900 mb-6">Sécurité du compte</h3>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                         <div className="p-2 bg-white rounded-lg border border-slate-100">
                           <Lock className="w-5 h-5 text-slate-400" />
                         </div>
@@ -327,7 +327,7 @@ export const SettingsPage = () => {
                       <Button variant="outline" size="sm" onClick={() => setIsPasswordModalOpen(true)} className="text-xs font-bold">Modifier</Button>
                     </div>
                     <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                         <div className="p-2 bg-white rounded-lg border border-slate-100">
                           <Shield className={cn("w-5 h-5", is2FAEnabled ? "text-emerald-500" : "text-slate-400")} />
                         </div>
@@ -432,7 +432,7 @@ export const SettingsPage = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                     {THEMES.map((theme) => (
                       <button
                         key={theme.id}

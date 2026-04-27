@@ -50,6 +50,7 @@ import { useNotification } from '../../context/NotificationContext';
 import { projectService } from '../../services/project.service';
 import { dashboardService } from '../../services/dashboard.service';
 import { attendanceService } from '../../services/attendance.service';
+import { projectTaskService } from '../../services/projectTask.service';
 
 export const Dashboard = () => {
   const { can } = usePermissions();
@@ -62,6 +63,7 @@ export const Dashboard = () => {
   const technicianProject = currentEmployee?.project;
   const technicianHistory = currentEmployee?.assignmentHistory || [];
   const technicianChecklists = checklists.filter(c => technicianProjectId ? c.projectId === technicianProjectId : false);
+  const [technicianTasks, setTechnicianTasks] = useState<any[]>([]);
 
   const [selectedRegion, setSelectedRegion] = useState('Toutes les régions');
   const [selectedProject, setSelectedProject] = useState<number | null>(null); // null = Tous les chantiers
@@ -123,6 +125,23 @@ export const Dashboard = () => {
       attendanceService.checkToday(currentEmployee.id).then(setTodayAttendance);
     }
   }, [currentEmployee?.id]);
+
+  // Charger les tâches du technicien
+  useEffect(() => {
+    if (role === 'technicien' && technicianProjectId && currentEmployee?.id) {
+      const loadTasks = async () => {
+        try {
+          const tasks = await projectTaskService.getAll(technicianProjectId);
+          // Filtrer les tâches assignées au technicien actuel
+          const myTasks = tasks.filter(task => task.assignedTo === currentEmployee.id);
+          setTechnicianTasks(myTasks);
+        } catch (err) {
+          console.error('Erreur chargement tâches:', err);
+        }
+      };
+      loadTasks();
+    }
+  }, [role, technicianProjectId, currentEmployee?.id]);
 
   const handleClockAction = async () => {
     if (!currentEmployee?.id || !technicianProjectId) {
@@ -594,7 +613,7 @@ export const Dashboard = () => {
                 <h3 className="text-xl font-black text-slate-900 tracking-tight">Évolution Financière (FCFA)</h3>
                 <p className="text-sm text-slate-500 font-medium">Montant facturé vs Dépenses (Millions)</p>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-[var(--color-primary)]"></div>
                   <span className="text-xs font-bold text-slate-600">Montant facturé</span>
@@ -733,45 +752,78 @@ export const Dashboard = () => {
               </div>
             </Card>
 
-            <Card className="p-8 border-none shadow-xl shadow-slate-200/50">
+            <Card className="p-8 bg-slate-900 text-white border-none shadow-2xl shadow-blue-900/20">
               <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Incidents du Chantier</h3>
-                  <p className="text-sm text-slate-500 font-medium">Alertes et signalements en temps réel</p>
-                </div>
-                <div className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5" />
-                </div>
+                <h3 className="text-xl font-black tracking-tight flex items-center gap-2">
+                  <AlertTriangle className="w-6 h-6 text-yellow-500" />
+                  Alertes Métier
+                </h3>
+                <span className="bg-red-500 text-white text-[10px] font-black px-2 py-1 rounded-full animate-pulse">{criticalIncidents} CRITIQUES</span>
               </div>
               <div className="space-y-4">
-                {filteredSourceIncidents.length > 0 ? filteredSourceIncidents.map((incident) => (
-                  <div key={incident.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className={cn(
-                        "w-2 h-12 rounded-full",
-                        incident.gravity === 'Critique' ? "bg-red-500" : incident.gravity === 'Majeur' ? "bg-amber-500" : "bg-blue-500"
-                      )}></div>
-                      <div>
-                        <p className="font-black text-slate-900">{incident.title}</p>
-                        <div className="flex items-center gap-3 mt-1">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{incident.date}</span>
-                          <span className={cn(
-                            "text-[10px] font-black px-2 py-0.5 rounded-lg uppercase",
-                            incident.gravity === 'Critique' ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
-                          )}>{incident.gravity}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] font-black px-3 py-1 bg-white border border-slate-200 text-slate-600 rounded-full uppercase tracking-widest">
-                        {incident.status}
-                      </span>
-                    </div>
-                  </div>
-                )) : (
-                  <div className="py-10 text-center">
-                    <p className="text-slate-400 font-bold text-sm italic">Aucun incident signalé sur ce chantier.</p>
-                  </div>
+                {/* Dynamic Alerts from Projects (80% budget consumption) */}
+                {filteredSourceProjects.map(p => {
+                  const budget = Math.round(Number(p.budget)) || 0;
+                  const projectExpenses = Math.abs(filteredSourceTransactions
+                    .filter(t => t.projectId === p.id && t.type === 'expense')
+                    .reduce((sum, t) => sum + t.amount, 0));
+
+                  if (budget > 0 && projectExpenses >= budget * 0.8) {
+                    return (
+                      <AlertItem
+                        key={`alert-budget-${p.id}`}
+                        type="danger"
+                        title="Alerte Budget (80%)"
+                        desc={`${p.name} - Consommation: ${new Intl.NumberFormat('fr-FR').format(projectExpenses)} FCFA`}
+                        onClick={() => setSelectedAlert({
+                          title: 'Alerte Budget (80%)',
+                          chantier: p.name,
+                          budget: new Intl.NumberFormat('fr-FR').format(budget) + ' FCFA',
+                          depenses: new Intl.NumberFormat('fr-FR').format(projectExpenses) + ' FCFA',
+                          ratio: Math.round((projectExpenses / budget) * 100) + '%'
+                        })}
+                      />
+                    );
+                  }
+                  return null;
+                })}
+
+                {/* Dynamic Alerts from Incidents */}
+                {filteredSourceIncidents.slice(0, 4).map(incident => (
+                  <AlertItem
+                    key={`alert-incident-${incident.id}`}
+                    type={incident.gravity === 'Critique' ? 'danger' : 'warning'}
+                    title={`Incident: ${incident.type}`}
+                    desc={`${projects.find(p => p.id === incident.projectId)?.name || 'Chantier inconnu'} - ${incident.desc}`}
+                    onClick={() => setSelectedAlert({
+                      title: `Incident ${incident.gravity}`,
+                      chantier: projects.find(p => p.id === incident.projectId)?.name || 'Chantier inconnu',
+                      gravite: incident.gravity,
+                      description: incident.desc,
+                      date: incident.date,
+                      statut: incident.status
+                    })}
+                  />
+                ))}
+
+                {/* Alertes de Sécurité */}
+                {filteredSourceIncidents.filter(i => i.gravity === 'Critique').length === 0 && filteredSourceProjects.length > 0 && (
+                  <AlertItem
+                    type="success"
+                    title="Sécurité OK"
+                    desc="Aucun incident critique sur les chantiers actifs"
+                    onClick={() => {}}
+                  />
+                )}
+
+                {/* Alertes de Production */}
+                {filteredSourceProjects.filter(p => p.status === 'Actif').length > 0 && (
+                  <AlertItem
+                    type="info"
+                    title="Production Active"
+                    desc={`${filteredSourceProjects.filter(p => p.status === 'Actif').length} chantier(s) en cours`}
+                    onClick={() => {}}
+                  />
                 )}
               </div>
             </Card>
@@ -782,27 +834,37 @@ export const Dashboard = () => {
           <h3 className="text-xl font-black text-slate-900 tracking-tight mb-2">
             {(role === 'dg' || role === 'chef') ? 'Structure des Coûts' :
               role === 'rh' ? 'Répartition par Poste' :
-                'Historique des Affectations'}
+                'Historique des tâches'}
           </h3>
           <p className="text-sm text-slate-500 font-medium mb-8">
             {(role === 'dg' || role === 'chef') ? 'Répartition par poste de dépense' :
               role === 'rh' ? 'Répartition des effectifs par catégorie' :
-                'Parcours des chantiers précédents'}
+                'Tâches assignées par le chef chantier'}
           </p>
           {role === 'technicien' ? (
             <div className="flex-1 space-y-4">
-              {technicianHistory.length > 0 ? technicianHistory.map((h, i) => (
+              {technicianTasks.length > 0 ? technicianTasks.map((task, i) => (
                 <div key={i} className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
-                  <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">
-                    <Building2 className="w-5 h-5" />
+                  <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600">
+                    <HardHat className="w-5 h-5" />
                   </div>
-                  <div>
-                    <p className="text-sm font-black text-slate-900">{h}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Affectation passée</p>
+                  <div className="flex-1">
+                    <p className="text-sm font-black text-slate-900">{task.title}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      {task.status === 'À faire' ? 'À faire' : 
+                       task.status === 'En cours' ? 'En cours' : 
+                       task.status === 'Terminé' ? 'Terminé' : 'Bloqué'}
+                    </p>
+                    {task.dueDate && (
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Échéance : {new Date(task.dueDate).toLocaleDateString('fr-FR')}
+                      </p>
+                    )}
                   </div>
+                  <div className="w-2 h-2 rounded-full bg-purple-400"></div>
                 </div>
               )) : (
-                <p className="text-center py-10 text-slate-400 text-xs font-bold italic">Aucun historique disponible</p>
+                <p className="text-center py-10 text-slate-400 text-xs font-bold italic">Aucune tâche assignée</p>
               )}
             </div>
           ) : (
@@ -912,80 +974,83 @@ export const Dashboard = () => {
           </div>
         </Card>
 
-        <Card className="p-8 bg-slate-900 text-white border-none shadow-2xl shadow-blue-900/20">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-xl font-black tracking-tight flex items-center gap-2">
-              <AlertTriangle className="w-6 h-6 text-yellow-500" />
-              Alertes Métier
-            </h3>
-            <span className="bg-red-500 text-white text-[10px] font-black px-2 py-1 rounded-full animate-pulse">{criticalIncidents} CRITIQUES</span>
-          </div>
-          <div className="space-y-4">
-            {/* Dynamic Alerts from Projects (80% budget consumption) */}
-            {filteredSourceProjects.map(p => {
-              const budget = Math.round(Number(p.budget)) || 0;
-              const projectExpenses = Math.abs(filteredSourceTransactions
-                .filter(t => t.projectId === p.id && t.type === 'expense')
-                .reduce((sum, t) => sum + t.amount, 0));
+        {/* Alertes Métier Card - Uniquement pour DG et Chef */}
+        {(role === 'dg' || role === 'chef') && (
+          <Card className="p-8 bg-slate-900 text-white border-none shadow-2xl shadow-blue-900/20">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-xl font-black tracking-tight flex items-center gap-2">
+                <AlertTriangle className="w-6 h-6 text-yellow-500" />
+                Alertes Métier
+              </h3>
+              <span className="bg-red-500 text-white text-[10px] font-black px-2 py-1 rounded-full animate-pulse">{criticalIncidents} CRITIQUES</span>
+            </div>
+            <div className="space-y-4">
+              {/* Dynamic Alerts from Projects (80% budget consumption) */}
+              {filteredSourceProjects.map(p => {
+                const budget = Math.round(Number(p.budget)) || 0;
+                const projectExpenses = Math.abs(filteredSourceTransactions
+                  .filter(t => t.projectId === p.id && t.type === 'expense')
+                  .reduce((sum, t) => sum + t.amount, 0));
 
-              if (budget > 0 && projectExpenses >= budget * 0.8) {
-                return (
-                  <AlertItem
-                    key={`alert-budget-${p.id}`}
-                    type="danger"
-                    title="Alerte Budget (80%)"
-                    desc={`${p.name} - Consommation: ${new Intl.NumberFormat('fr-FR').format(projectExpenses)} FCFA`}
-                    onClick={() => setSelectedAlert({
-                      title: 'Alerte Budget (80%)',
-                      chantier: p.name,
-                      budget: new Intl.NumberFormat('fr-FR').format(budget) + ' FCFA',
-                      depenses: new Intl.NumberFormat('fr-FR').format(projectExpenses) + ' FCFA',
-                      ratio: Math.round((projectExpenses / budget) * 100) + '%'
-                    })}
-                  />
-                );
-              }
-              return null;
-            })}
+                if (budget > 0 && projectExpenses >= budget * 0.8) {
+                  return (
+                    <AlertItem
+                      key={`alert-budget-${p.id}`}
+                      type="danger"
+                      title="Alerte Budget (80%)"
+                      desc={`${p.name} - Consommation: ${new Intl.NumberFormat('fr-FR').format(projectExpenses)} FCFA`}
+                      onClick={() => setSelectedAlert({
+                        title: 'Alerte Budget (80%)',
+                        chantier: p.name,
+                        budget: new Intl.NumberFormat('fr-FR').format(budget) + ' FCFA',
+                        depenses: new Intl.NumberFormat('fr-FR').format(projectExpenses) + ' FCFA',
+                        ratio: Math.round((projectExpenses / budget) * 100) + '%'
+                      })}
+                    />
+                  );
+                }
+                return null;
+              })}
 
-            {/* Dynamic Alerts from Incidents */}
-            {filteredSourceIncidents.slice(0, 4).map(incident => (
-              <AlertItem
-                key={`alert-incident-${incident.id}`}
-                type={incident.gravity === 'Critique' ? 'danger' : 'warning'}
-                title={`Incident: ${incident.type}`}
-                desc={`${projects.find(p => p.id === incident.projectId)?.name || 'Chantier inconnu'} - ${incident.desc}`}
-                onClick={() => setSelectedAlert({
-                  title: `Incident ${incident.gravity}`,
-                  chantier: projects.find(p => p.id === incident.projectId)?.name || 'Chantier inconnu',
-                  type: incident.type,
-                  description: incident.description,
-                  date: incident.date,
-                  statut: incident.status,
-                  image: incident.image
-                })}
-              />
-            ))}
+              {/* Dynamic Alerts from Incidents */}
+              {filteredSourceIncidents.slice(0, 4).map(incident => (
+                <AlertItem
+                  key={`alert-incident-${incident.id}`}
+                  type={incident.gravity === 'Critique' ? 'danger' : 'warning'}
+                  title={`Incident: ${incident.type}`}
+                  desc={`${projects.find(p => p.id === incident.projectId)?.name || 'Chantier inconnu'} - ${incident.desc}`}
+                  onClick={() => setSelectedAlert({
+                    title: `Incident ${incident.gravity}`,
+                    chantier: projects.find(p => p.id === incident.projectId)?.name || 'Chantier inconnu',
+                    type: incident.type,
+                    description: incident.description,
+                    date: incident.date,
+                    statut: incident.status,
+                    image: incident.image
+                  })}
+                />
+              ))}
 
-            {/* Fallback if no dynamic alerts */}
-            {filteredSourceProjects.every(p => {
-              const budget = Math.round(Number(p.budget)) || 0;
-              const projectExpenses = Math.abs(filteredSourceTransactions.filter(t => t.projectId === p.id && t.type === 'expense').reduce((sum, t) => sum + t.amount, 0));
-              return budget === 0 || projectExpenses < budget * 0.8;
-            }) && filteredSourceIncidents.length === 0 && (
-                <div className="py-8 text-center border border-dashed border-slate-700 rounded-2xl">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Aucune alerte critique</p>
-                </div>
-              )}
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => setIsAlertCenterModalOpen(true)}
-            className="w-full mt-8 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white font-bold"
-          >
-            Voir le centre d'alertes
-          </Button>
-        </Card>
+              {/* Fallback if no dynamic alerts */}
+              {filteredSourceProjects.every(p => {
+                const budget = Math.round(Number(p.budget)) || 0;
+                const projectExpenses = Math.abs(filteredSourceTransactions.filter(t => t.projectId === p.id && t.type === 'expense').reduce((sum, t) => sum + t.amount, 0));
+                return budget === 0 || projectExpenses < budget * 0.8;
+              }) && filteredSourceIncidents.length === 0 && (
+                  <div className="py-8 text-center border border-dashed border-slate-700 rounded-2xl">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Aucune alerte critique</p>
+                  </div>
+                )}
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => setIsAlertCenterModalOpen(true)}
+              className="w-full mt-8 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white font-bold"
+            >
+              Voir le centre d'alertes
+            </Button>
+          </Card>
+        )}
       </div>
 
       {/* Drill Down Modal Simulation */}
@@ -1025,12 +1090,18 @@ export const Dashboard = () => {
                   {selectedAlert.image && (
                     <div className="col-span-full mt-4">
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Preuve Photo</p>
-                      <img src={selectedAlert.image} alt="Preuve" className="w-full h-64 object-cover rounded-2xl border border-slate-100" referrerPolicy="no-referrer" />
+                      <img 
+                        src={selectedAlert.image.startsWith('http') ? selectedAlert.image : `${import.meta.env.VITE_API_URL || ''}${selectedAlert.image}`} 
+                        alt="Preuve" 
+                        className="w-full h-64 object-cover rounded-2xl border border-slate-100" 
+                        referrerPolicy="no-referrer" 
+                      />
                     </div>
                   )}
                 </div>
               </div>
 
+              {(role === 'dg' || role === 'chef') && (
               <div className="space-y-3">
                 <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Actions de Remédiation Immédiates</h4>
                 <Button
@@ -1065,6 +1136,7 @@ export const Dashboard = () => {
                   Escalader au Comité de Direction
                 </Button>
               </div>
+            )}
             </div>
           </Modal>
         )}
@@ -1153,6 +1225,19 @@ export const Dashboard = () => {
                           </span>
                         </div>
 
+                        {/* Afficher l'image si disponible */}
+                        {incident.image && (
+                          <div className="pt-4 border-t border-slate-50">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Preuve Photo</p>
+                            <img 
+                              src={incident.image.startsWith('http') ? incident.image : `${import.meta.env.VITE_API_URL || ''}${incident.image}`} 
+                              alt="Preuve incident" 
+                              className="w-full h-48 object-cover rounded-xl border border-slate-200" 
+                              referrerPolicy="no-referrer" 
+                            />
+                          </div>
+                        )}
+
                         <div className="pt-4 border-t border-slate-50">
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Historique des modifications</p>
                           <div className="space-y-2">
@@ -1188,6 +1273,19 @@ export const Dashboard = () => {
                             FERMÉ
                           </span>
                         </div>
+
+                        {/* Afficher l'image si disponible */}
+                        {incident.image && (
+                          <div className="pt-4 border-t border-slate-100">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Preuve Photo</p>
+                            <img 
+                              src={incident.image.startsWith('http') ? incident.image : `${import.meta.env.VITE_API_URL || ''}${incident.image}`} 
+                              alt="Preuve incident" 
+                              className="w-full h-48 object-cover rounded-xl border border-slate-200 opacity-75 grayscale-[0.5]" 
+                              referrerPolicy="no-referrer" 
+                            />
+                          </div>
+                        )}
 
                         <div className="pt-4 border-t border-slate-100">
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Historique complet</p>
@@ -1240,7 +1338,7 @@ export const Dashboard = () => {
                 <label className="text-sm font-bold text-slate-700">Message / Instructions</label>
                 <textarea className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm h-32 outline-none focus:ring-2 focus:ring-[var(--color-primary)]" placeholder="Détaillez les points à aborder..."></textarea>
               </div>
-              <div className="flex justify-end gap-3">
+              <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
                 <Button variant="outline" onClick={() => setIsConvoquerModalOpen(false)}>Annuler</Button>
                 <Button onClick={() => setIsConvoquerModalOpen(false)} className="font-bold">Envoyer la Convocation</Button>
               </div>
@@ -1257,7 +1355,7 @@ export const Dashboard = () => {
             size="lg"
           >
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-slate-700">Type d'Incident</label>
                   <select className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
@@ -1283,7 +1381,7 @@ export const Dashboard = () => {
               <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
                 <p className="text-xs font-bold text-blue-700">Le rapport sera automatiquement formaté selon la charte VAN BTP et envoyé au client après validation.</p>
               </div>
-              <div className="flex justify-end gap-3">
+              <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
                 <Button variant="outline" onClick={() => setIsIncidentModalOpen(false)}>Annuler</Button>
                 <Button onClick={() => setIsIncidentModalOpen(false)} className="font-bold">Générer le Rapport</Button>
               </div>
@@ -1532,7 +1630,7 @@ export const Dashboard = () => {
               </div>
               <div className="p-6 bg-slate-50 rounded-2xl space-y-4">
                 <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Insights Stratégiques Réels</h4>
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <div className="p-4 bg-white rounded-xl shadow-sm">
                     <p className="text-[10px] font-bold text-slate-400 uppercase">Valeur Totale</p>
                     <p className="text-lg font-black text-slate-900">
@@ -1590,9 +1688,9 @@ export const Dashboard = () => {
               {isClocking ? (
                 <div className="animate-spin w-6 h-6 border-2 border-white border-t-transparent rounded-full" />
               ) : !todayAttendance?.arrivalTime ? (
-                <LogIn className="w-8 h-8 text-white" />
+                <span className="text-white font-black text-sm">Arrivé</span>
               ) : (
-                <LogOut className="w-8 h-8 text-white" />
+                <span className="text-white font-black text-sm">Départ</span>
               )}
             </Button>
             

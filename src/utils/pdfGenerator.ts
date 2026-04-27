@@ -43,7 +43,7 @@ export const generateInvoicePDF = (data: PDFInvoiceData) => {
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(28);
-  doc.text('VAN BTP SA', 20, 25);
+  doc.text('VAN BTP ', 20, 25);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
@@ -194,7 +194,7 @@ export const generateInvoicePDF = (data: PDFInvoiceData) => {
   doc.setFontSize(9);
   doc.setTextColor(100, 116, 139);
   doc.text([
-    'Veuillez libeller votre chèque à l\'ordre de VAN BTP SA',
+    'Veuillez libeller votre chèque à l\'ordre de VAN BTP ',
     'Virement Bancaire : BICEC Yaoundé',
     'RIB: 12345 67890 12345678901 23'
   ], 20, finalY + 46);

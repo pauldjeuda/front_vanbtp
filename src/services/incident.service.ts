@@ -9,6 +9,11 @@ export const incidentService = {
     const res = await api.get<{ data: any[] }>(`/api/incidents${params.toString() ? `?${params}` : ''}`);
     return res.data;
   },
-  create: async (payload: any) => (await api.post<{ data: any }>('/api/incidents', payload)).data,
+  create: async (payload: any) => {
+    if (payload instanceof FormData) {
+      return (await api.upload<{ data: any }>('/api/incidents', payload)).data;
+    }
+    return (await api.post<{ data: any }>('/api/incidents', payload)).data;
+  },
   update: async (id: number, payload: any) => (await api.put<{ data: any }>(`/api/incidents/${id}`, payload)).data,
 };

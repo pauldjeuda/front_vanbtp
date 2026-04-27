@@ -312,12 +312,21 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       chantier: projectNameById[projectId] || s.project?.name || '',
       project: projectNameById[projectId] || s.project?.name || '',
       date: s.date || s.startDate || s.createdAt?.slice(0, 10) || '',
-      tasks: (s.tasks || []).map((t: any) => ({ id: String(t.id), title: t.title, completed: !!t.completed, lotNumber: t.lotNumber || null, lotName: t.lotName || null })),
+      tasks: (s.tasks || []).map((t: any) => ({ 
+        id: String(t.id), 
+        title: t.title, 
+        completed: !!t.completed, 
+        cost: Number(t.cost || 0),
+        lotNumber: t.lotNumber || null, 
+        lotName: t.lotName || null 
+      })),
       progress: s.progress || 0,
+      type: s.type || 'subcontract',
       company: s.entreprise || '',
       niu: s.niu || '',
       startDate: s.startDate || s.date || '',
       endDate: s.endDate || '',
+      paymentStatus: s.paymentStatus || 'En attente',
     };
   };
 
@@ -549,20 +558,40 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const addIncident = async (incident: any) => {
     const projectId = resolveProjectId(incident.projectId || incident.chantier || incident.location);
-    const payload = {
-      title: incident.title,
-      type: incident.type,
-      category: incident.category,
-      gravity: incident.gravity,
-      description: incident.description || incident.desc || '',
-      status: incident.status || 'Ouvert',
-      actionPlan: incident.actionPlan || '',
-      impact: incident.impact || '',
-      incidentDate: incident.incidentDate || incident.date || new Date().toISOString().split('T')[0],
-      projectId
-    };
-    const created = await incidentService.create(payload);
-    setIncidents((prev) => [normalizeIncident(created), ...prev]);
+    
+    // Si une image est fournie, on utilise FormData
+    if (incident.imageFile instanceof File) {
+      const formData = new FormData();
+      formData.append('title', incident.title);
+      formData.append('type', incident.type);
+      formData.append('category', incident.category);
+      formData.append('gravity', incident.gravity);
+      formData.append('description', incident.description || incident.desc || '');
+      formData.append('status', incident.status || 'Ouvert');
+      formData.append('actionPlan', incident.actionPlan || '');
+      formData.append('impact', incident.impact || '');
+      formData.append('incidentDate', incident.incidentDate || incident.date || new Date().toISOString().split('T')[0]);
+      formData.append('projectId', String(projectId));
+      formData.append('image', incident.imageFile);
+
+      const created = await incidentService.create(formData);
+      setIncidents((prev) => [normalizeIncident(created), ...prev]);
+    } else {
+      const payload = {
+        title: incident.title,
+        type: incident.type,
+        category: incident.category,
+        gravity: incident.gravity,
+        description: incident.description || incident.desc || '',
+        status: incident.status || 'Ouvert',
+        actionPlan: incident.actionPlan || '',
+        impact: incident.impact || '',
+        incidentDate: incident.incidentDate || incident.date || new Date().toISOString().split('T')[0],
+        projectId
+      };
+      const created = await incidentService.create(payload);
+      setIncidents((prev) => [normalizeIncident(created), ...prev]);
+    }
   };
 
   const updateIncident = async (id: number, updates: Partial<Incident>) => {
@@ -731,10 +760,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       objet: subcontract.objet || subcontract.task || '',
       montant: Number(subcontract.montant || subcontract.amount || 0),
       progress: subcontract.progress || 0,
+      type: subcontract.type || 'subcontract',
       startDate: subcontract.startDate || subcontract.date || undefined,
       projectId,
       tasks: (subcontract.tasks || []).map((t: any) => ({
-        title: t.title || t,
+        title: t.title || t.name || t,
+        cost: Number(t.cost || 0),
         lotNumber: t.lotNumber || null,
         lotName: t.lotName || null
       }))

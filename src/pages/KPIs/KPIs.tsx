@@ -135,7 +135,7 @@ export const KPIsPage = () => {
         <>
       {/* KPI Cards globaux */}
       {totals && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { label: 'Budget total', value: `${fmt(totals.budget || 0)} FCFA`, icon: Target,      color: 'text-blue-600',    bg: 'bg-blue-50' },
             { label: 'Coûts réels',  value: `${fmt(totals.depenses || 0)} FCFA`, icon: Banknote, color: 'text-red-600',     bg: 'bg-red-50' },

@@ -182,7 +182,7 @@ export const ProductionPage = () => {
                   )} />
                   <div className="p-6">
                     <div className="flex items-start justify-between mb-6">
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                         <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-3xl group-hover:scale-110 transition-transform text-[var(--color-primary)]">
                           <Layers className="w-6 h-6" />
                         </div>
@@ -199,7 +199,7 @@ export const ProductionPage = () => {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                       {[
                         { label: 'Produit', val: item.produced, color: 'slate' },
                         { label: 'Vendu', val: item.sold, color: 'blue' },
@@ -383,7 +383,7 @@ export const ProductionPage = () => {
       {/* Modal Production */}
       <Modal isOpen={isEntryModalOpen} onClose={() => setIsEntryModalOpen(false)} title="Enregistrer une production" size="md">
         <form onSubmit={handleCreateEntry} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-bold text-slate-700">Type de produit</label>
               <select value={newEntry.productType} onChange={e => setNewEntry(p => ({ ...p, productType: e.target.value }))}
@@ -394,7 +394,7 @@ export const ProductionPage = () => {
             <Input label="Désignation (ex: Parpaing 15x20)" value={newEntry.productLabel}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewEntry(p => ({ ...p, productLabel: e.target.value }))} placeholder="Optionnel" />
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Input label="Quantité" type="number" min="0" required value={newEntry.quantity}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewEntry(p => ({ ...p, quantity: e.target.value }))} />
             <div className="space-y-1.5">
@@ -419,7 +419,7 @@ export const ProductionPage = () => {
       {/* Modal Vente */}
       <Modal isOpen={isSaleModalOpen} onClose={() => setIsSaleModalOpen(false)} title="Enregistrer une vente" size="md">
         <form onSubmit={handleCreateSale} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-bold text-slate-700">Type de produit</label>
               <select value={newSale.productType} onChange={e => setNewSale(p => ({ ...p, productType: e.target.value }))}
@@ -458,7 +458,7 @@ export const ProductionPage = () => {
               </div>
             );
           })()}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Input label="Quantité" type="number" min="0" required value={newSale.quantity}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewSale(p => ({ ...p, quantity: e.target.value }))} />
             <div className="space-y-1.5">
@@ -476,7 +476,7 @@ export const ProductionPage = () => {
               <p className="text-sm font-bold text-emerald-700">Total : {(Number(newSale.quantity) * Number(newSale.unitPrice)).toLocaleString()} FCFA</p>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="Client" value={newSale.client} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewSale(p => ({ ...p, client: e.target.value }))} />
             <Input label="Référence" value={newSale.reference} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewSale(p => ({ ...p, reference: e.target.value }))} />
           </div>

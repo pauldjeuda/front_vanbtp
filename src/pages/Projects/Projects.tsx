@@ -664,7 +664,7 @@ export const ProjectsPage = () => {
                   value={newProject.name}
                   onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
                 />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input
                     label="Numéro de Marché"
                     placeholder="N° 001/M/MINTP/..."
@@ -683,7 +683,7 @@ export const ProjectsPage = () => {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-sm font-bold text-slate-700">Région</label>
                     <select
@@ -731,7 +731,7 @@ export const ProjectsPage = () => {
                   {newProject.category === 'Bâtiment' && (
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-slate-700">Sous-catégorie</label>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {(['Gros œuvre', 'Second œuvre'] as const).map(sub => (
                           <button
                             key={sub}
@@ -788,7 +788,7 @@ export const ProjectsPage = () => {
             {addStep === 2 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Paramètres Financiers & Fiscaux</h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-sm font-bold text-slate-700">Montant TTC (FCFA)</label>
                     <div className="relative">
@@ -864,7 +864,7 @@ export const ProjectsPage = () => {
                   value={newProject.manager}
                   onChange={(e) => setNewProject({ ...newProject, manager: e.target.value })}
                 />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input
                     label="Date Ordre de Service"
                     type="date" min={today}
@@ -895,7 +895,7 @@ export const ProjectsPage = () => {
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Résumé du Dossier Marché</h4>
                 <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase">Libellé</p>
                       <p className="text-sm font-black text-slate-900">{newProject.name || 'Non renseigné'}</p>
@@ -1179,7 +1179,7 @@ export const ProjectsPage = () => {
                       {subcontracts.filter(s => s.projectId === selectedProject.id).map(s => (
                         <Card key={s.id} className="p-6 border-none shadow-sm bg-slate-50/50">
                           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
-                            <div className="flex items-center gap-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                               <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[var(--color-primary)] shadow-sm">
                                 <Handshake className="w-6 h-6" />
                               </div>
@@ -1272,7 +1272,7 @@ export const ProjectsPage = () => {
                         .filter(r => r.projectId === selectedProject.id)
                         .map((report) => (
                           <div key={report.id} className="p-6 bg-white border border-slate-100 rounded-3xl flex items-center justify-between hover:shadow-xl hover:border-[var(--color-primary)] transition-all cursor-pointer group">
-                            <div className="flex items-center gap-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-6">
                               <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-[var(--color-primary)] group-hover:text-white transition-colors">
                                 <ClipboardList className="w-7 h-7" />
                               </div>
@@ -1284,7 +1284,7 @@ export const ProjectsPage = () => {
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-6">
                               <div className="text-right hidden md:block">
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Météo</p>
                                 <p className="text-sm font-black text-slate-900">{report.weather}</p>
@@ -1366,11 +1366,11 @@ export const ProjectsPage = () => {
                 }
               }}
             >
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input label="Nom du Projet" name="name" defaultValue={editingProject?.name} required />
                 <Input label="Code Projet" name="code" defaultValue={editingProject?.code} required />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input label="Client" name="client" defaultValue={editingProject?.client} required />
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-slate-700">Statut</label>
@@ -1388,7 +1388,7 @@ export const ProjectsPage = () => {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input label="Budget (FCFA)" name="budget" defaultValue={editingProject?.budget} required />
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-slate-700">Région</label>
@@ -1404,7 +1404,7 @@ export const ProjectsPage = () => {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-slate-700">Catégorie du chantier</label>
                   <div className="flex flex-col gap-2">
@@ -1458,7 +1458,7 @@ export const ProjectsPage = () => {
                   </div>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input label="Conducteur de Travaux" name="manager" defaultValue={editingProject?.manager} />
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-slate-700">Lieu d'Exécution</label>
@@ -1501,7 +1501,7 @@ export const ProjectsPage = () => {
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input label="Date Début" name="start" type="date" min={today} defaultValue={editingProject?.start} required />
                 <Input label="Date Fin Prévue" name="end" type="date" min={today} defaultValue={editingProject?.end} required />
               </div>
@@ -1562,7 +1562,7 @@ export const ProjectsPage = () => {
               <div className="border-t border-slate-100 pt-6">
                 <h3 className="font-black text-slate-900 mb-4">Nouvel avenant</h3>
                 <form onSubmit={handleCreateAmendment} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-sm font-bold text-slate-700">Type de modification</label>
                       <select value={newAmendment.type} onChange={e => handleAmendmentTypeChange(e.target.value)}
@@ -1575,7 +1575,7 @@ export const ProjectsPage = () => {
                     </div>
                   </div>
                   {newAmendment.type === 'Délai' && (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Input label="Ancienne date de fin" type="date" min={today} value={newAmendment.ancienneDate}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewAmendment(p => ({ ...p, ancienneDate: e.target.value }))} 
                         readonly className="bg-slate-100 cursor-not-allowed" />
@@ -1584,7 +1584,7 @@ export const ProjectsPage = () => {
                     </div>
                   )}
                   {newAmendment.type === 'Budget' && (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Input label="Budget initial (FCFA)" type="number" min="0" value={newAmendment.ancienBudget}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewAmendment(p => ({ ...p, ancienBudget: e.target.value }))} 
                         readonly className="bg-slate-100 cursor-not-allowed" />
@@ -1599,7 +1599,7 @@ export const ProjectsPage = () => {
                       className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm h-24 resize-none focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
                       placeholder="Décrivez la raison de cette modification (retards approvisionnement, intempéries, modification client...)"/>
                   </div>
-                  <div className="flex justify-end gap-3">
+                  <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
                     <Button variant="outline" type="button" onClick={() => setIsAmendmentModalOpen(false)}>Fermer</Button>
                     <Button type="submit" isLoading={isSubmittingAmendment}>Soumettre l'avenant</Button>
                   </div>
@@ -1619,7 +1619,7 @@ export const ProjectsPage = () => {
           >
             <div className="space-y-8">
               <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                   <div className="p-3 bg-blue-50 rounded-2xl text-blue-600">
                     <Calendar className="w-6 h-6" />
                   </div>
@@ -1706,9 +1706,9 @@ export const ProjectsPage = () => {
               {isGanttEditMode && (
                 <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-300">
                   <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Modification des Informations Gantt</h5>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Input label="Tâche Sélectionnée" defaultValue="Ouvrages d'Art (Dalots)" />
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <Input label="Début (Mois)" type="number" min="0" defaultValue="2" />
                       <Input label="Durée (Mois)" type="number" min="1" defaultValue="3" />
                     </div>
@@ -1749,7 +1749,7 @@ export const ProjectsPage = () => {
           >
             <div className="space-y-6">
               <p className="text-sm text-slate-600">Êtes-vous sûr de vouloir supprimer le chantier <span className="font-black text-slate-900">{projectToDelete?.name}</span> ? Cette action est irréversible.</p>
-              <div className="flex justify-end gap-3">
+              <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
                 <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>Annuler</Button>
                 <Button
                   className="bg-red-600 hover:bg-red-700 font-bold"
@@ -1775,7 +1775,7 @@ export const ProjectsPage = () => {
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-slate-700">Effectifs Présents (VAN BTP + Sous-traitants)</label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Input placeholder="Ouvriers" type="number" min="0" />
                   <Input placeholder="Engins" type="number" min="0" />
                 </div>
@@ -1924,11 +1924,11 @@ export const ProjectsPage = () => {
                 <option>Signalisation</option>
               </select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input label="Date de début" type="date" min={today} required />
               <Input label="Date de fin" type="date" min={today} required />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input label="Responsable" required />
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-slate-700">Statut</label>

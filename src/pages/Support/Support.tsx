@@ -376,7 +376,7 @@ export const SupportPage = () => {
           <form onSubmit={handleUploadSubmit} className="space-y-6">
             {uploadStep === 1 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-sm font-bold text-slate-700">Dossier Destination</label>
                     <select 
@@ -514,7 +514,7 @@ export const SupportPage = () => {
                     onChange={(e) => setNewTicket({...newTicket, title: e.target.value})}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-sm font-bold text-slate-700">Module concerné</label>
                     <select 
@@ -587,7 +587,7 @@ export const SupportPage = () => {
             title={`Détail Document: ${selectedDoc.name}`}
           >
             <div className="space-y-8">
-              <div className="flex items-center gap-6">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-6">
                 <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-400">
                   <FileText className="w-10 h-10" />
                 </div>
@@ -597,7 +597,7 @@ export const SupportPage = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Type</p>
                   <p className="text-sm font-black text-slate-900">{selectedDoc.type}</p>
@@ -680,7 +680,7 @@ export const SupportPage = () => {
             <label className="text-sm font-bold text-slate-700">Message</label>
             <textarea className="w-full h-24 p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)]" placeholder="Message optionnel..."></textarea>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <Button className="flex-1 font-bold" onClick={() => { setIsShareModalOpen(false); notify("Lien de partage envoyé par email.", 'success', '/support'); }}>Envoyer</Button>
             <Button variant="outline" className="font-bold" onClick={() => { setIsShareModalOpen(false); notify("Lien copié dans le presse-papier.", 'success', '/support'); }}>Copier le lien</Button>
           </div>
@@ -694,7 +694,7 @@ export const SupportPage = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input type="text" placeholder="Rechercher dans l'aide..." className="w-full h-11 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)]" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-blue-200 cursor-pointer">
               <h4 className="font-black text-slate-900">FAQ</h4>
               <p className="text-xs text-slate-500">Questions fréquentes</p>
@@ -793,7 +793,7 @@ const ReferentialCard = ({ title, desc, icon: Icon, count, onClick }: any) => (
 );
 
 const ContactItem = ({ icon: Icon, label, value }: any) => (
-  <div className="flex items-center gap-4">
+  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
     <div className="p-2 bg-slate-50 text-slate-400 rounded-lg">
       <Icon className="w-4 h-4" />
     </div>

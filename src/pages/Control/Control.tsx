@@ -125,10 +125,12 @@ export const ControlPage = () => {
   );
 
   const [incidentImage, setIncidentImage] = useState<string | null>(null);
+  const [incidentFile, setIncidentFile] = useState<File | null>(null);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setIncidentFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setIncidentImage(reader.result as string);
@@ -160,7 +162,8 @@ export const ControlPage = () => {
           // status ENUM DB: 'Ouvert', 'En cours de traitement', 'Résolu', 'Fermé'
           status: 'Ouvert',
           actionPlan: 'Analyse en cours par le responsable HSE.',
-          impact: 'Évaluation de l\'impact en cours.'
+          impact: 'Évaluation de l\'impact en cours.',
+          imageFile: incidentFile
         });
         addLog({
           module: 'Contrôle',
@@ -172,6 +175,7 @@ export const ControlPage = () => {
         setIsIncidentModalOpen(false);
         setIncidentStep(1);
         setIncidentImage(null);
+        setIncidentFile(null);
         setNewIncident({
           type: 'Accident de travail',
           gravity: 'Moyen',
@@ -888,7 +892,7 @@ export const ControlPage = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Date Prévue</p>
                 <p className="text-sm font-bold text-slate-900 flex items-center"><Calendar className="w-3 h-3 mr-2 text-slate-400" /> {selectedAudit.date}</p>
@@ -935,7 +939,7 @@ export const ControlPage = () => {
         {selectedIncident && (
           <div className="space-y-8">
             <div className="flex items-start justify-between">
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className={cn(
                   "w-14 h-14 rounded-2xl flex items-center justify-center",
                   selectedIncident.gravity === 'Critique' ? "bg-red-100 text-red-600" : 
@@ -978,7 +982,12 @@ export const ControlPage = () => {
               {selectedIncident.image && (
                 <div className="mt-4">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Preuve Photo</p>
-                  <img src={selectedIncident.image} alt="Preuve incident" className="w-full h-64 object-cover rounded-2xl border border-slate-100" referrerPolicy="no-referrer" />
+                  <img 
+                    src={selectedIncident.image.startsWith('http') ? selectedIncident.image : `${import.meta.env.VITE_API_URL || ''}${selectedIncident.image}`} 
+                    alt="Preuve incident" 
+                    className="w-full h-64 object-cover rounded-2xl border border-slate-100" 
+                    referrerPolicy="no-referrer" 
+                  />
                 </div>
               )}
             </div>
@@ -990,7 +999,7 @@ export const ControlPage = () => {
                   {(selectedIncident.history || [
                     { date: selectedIncident.date, action: 'Incident déclaré', user: selectedIncident.reporter }
                   ]).map((h: any, idx: number) => (
-                    <div key={idx} className="flex gap-3">
+                    <div key={idx} className="flex flex-col sm:flex-row gap-3">
                       <div className={cn(
                         "w-2 h-2 rounded-full mt-1.5 shrink-0",
                         idx === 0 ? "bg-red-500" : "bg-blue-500"
@@ -1065,7 +1074,7 @@ export const ControlPage = () => {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-bold text-slate-700">Niveau de Gravité</label>
-                    <div className="grid grid-cols-4 gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
                       {['Faible', 'Moyen', 'Haut', 'Critique'].map(g => (
                         <button 
                           key={g} 
@@ -1229,7 +1238,7 @@ export const ControlPage = () => {
                   value={newAudit.location}
                   onChange={(e) => setNewAudit({...newAudit, location: e.target.value})}
                 />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-slate-700">Observations terrain</label>
                     <textarea value={newAudit.observations} rows={3}

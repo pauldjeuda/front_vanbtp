@@ -36,7 +36,10 @@
         "close": "Fermer",
         "done": "Terminé",
         "search_placeholder": "Rechercher...",
-        "load_more": "Charger plus"
+        "load_more": "Charger plus",
+        "upload_document": "Uploader un Document",
+        "ged_management": "Gestion Documentaire (GED)",
+        "technical_support": "Support Technique"
       },
       "auth": {
         "login": "Connexion",
@@ -527,12 +530,97 @@
         "new_check": "Nouveau Contrôle"
       },
       "support": {
-        "title": "Support & GED",
+        "title": "Centre de Ressources",
+        "subtitle": "Gestion documentaire, support technique et référentiels métiers",
         "ged": "GED / Documents",
         "users": "Utilisateurs",
         "roles": "Rôles & Droits",
         "referential": "Référentiels",
-        "parameters": "Paramètres Métier"
+        "parameters": "Paramètres Métier",
+        "open_ticket": "Ouvrir un Ticket Support",
+        "search_placeholder": "Rechercher un fichier...",
+        "folders": {
+          "plans_techniques": "Plans & Techniques",
+          "contracts_markets": "Contrats & Marchés",
+          "invoices_quotes": "Factures & Devis",
+          "site_photos": "Photos Chantier"
+        },
+        "document_table": {
+          "filename": "Nom du fichier",
+          "type": "Type",
+          "project": "Chantier",
+          "date": "Date",
+          "size": "Taille",
+          "actions": "Actions"
+        },
+        "tickets": {
+          "title": "Mes Tickets Support",
+          "in_progress": "En cours",
+          "new": "Nouveau Ticket Support",
+          "title_label": "Titre du ticket",
+          "module_label": "Module concerné",
+          "priority_label": "Priorité",
+          "description_label": "Description",
+          "modules": {
+            "dashboard": "Tableau de bord",
+            "projects": "Chantiers",
+            "finances": "Finances",
+            "resources": "Ressources",
+            "control": "Contrôle",
+            "support": "Support"
+          },
+          "priorities": {
+            "low": "Basse",
+            "medium": "Moyenne",
+            "high": "Haute",
+            "critical": "Critique"
+          },
+          "description_placeholder": "Décrivez précisément votre problème ou votre besoin...",
+          "success": "Ticket créé avec succès",
+          "error": "Erreur lors de la création du ticket"
+        },
+        "upload": {
+          "title": "Archivage Documentaire Sécurisé",
+          "folder_label": "Dossier Destination",
+          "project_label": "Chantier rattaché",
+          "no_project": "Aucun (Document général)",
+          "name_label": "Nom du document",
+          "description_label": "Description",
+          "description_placeholder": "Ajoutez une description pour faciliter la recherche...",
+          "select_document": "Sélectionner le Document",
+          "drag_drop": "Glissez-déposez ou cliquez pour sélectionner",
+          "supported_formats": "Formats supportés : PDF, DOC, XLS, JPG, PNG",
+          "max_size": "Taille maximale : 10MB",
+          "success": "Document uploadé avec succès",
+          "error_no_file": "Veuillez sélectionner un fichier",
+          "error_no_name": "Veuillez donner un nom au document",
+          "error_upload": "Erreur lors de l'upload du document",
+          "download": "Téléchargement lancé"
+        },
+        "contact": {
+          "title": "Contact Support",
+          "response_time": "Temps de réponse moyen",
+          "availability": "Disponibilité",
+          "line": "Ligne Directe",
+          "location": "Support VAN BTP Douala / Yaoundé"
+        },
+        "help": {
+          "title": "Centre d'Aide",
+          "search_placeholder": "Rechercher dans l'aide...",
+          "knowledge_base": "Base de Connaissances",
+          "knowledge_desc": "Accédez aux guides d'utilisation et aux tutoriels vidéos de VAN BTP ERP.",
+          "community": "Communauté & Feedback",
+          "community_desc": "Partagez vos suggestions d'amélioration et échangez avec les autres utilisateurs.",
+          "consult_help": "Consulter l'Aide",
+          "join_forum": "Rejoindre le Forum"
+        },
+        "actions": {
+          "rename": "Renommer",
+          "move": "Déplacer",
+          "archive": "Archiver",
+          "delete": "Supprimer",
+          "view_history": "Voir historique"
+        }
       },
       "settings": {
         "title": "Paramètres Système",

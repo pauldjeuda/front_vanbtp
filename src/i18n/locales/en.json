@@ -32,7 +32,10 @@
         "close": "Close",
         "done": "Done",
         "search_placeholder": "Search...",
-        "load_more": "Load more"
+        "load_more": "Load more",
+        "upload_document": "Upload Document",
+        "ged_management": "Document Management (GED)",
+        "technical_support": "Technical Support"
       },
       "auth": {
         "login": "Login",
@@ -523,12 +526,97 @@
         "new_check": "New Control"
       },
       "support": {
-        "title": "Support & GED",
+        "title": "Resource Center",
+        "subtitle": "Document management, technical support and business referentials",
         "ged": "GED / Documents",
         "users": "Users",
         "roles": "Roles & Permissions",
         "referential": "Referentials",
-        "parameters": "Business Parameters"
+        "parameters": "Business Parameters",
+        "open_ticket": "Open Support Ticket",
+        "search_placeholder": "Search for a file...",
+        "folders": {
+          "plans_techniques": "Plans & Technical",
+          "contracts_markets": "Contracts & Markets",
+          "invoices_quotes": "Invoices & Quotes",
+          "site_photos": "Site Photos"
+        },
+        "document_table": {
+          "filename": "File Name",
+          "type": "Type",
+          "project": "Project",
+          "date": "Date",
+          "size": "Size",
+          "actions": "Actions"
+        },
+        "tickets": {
+          "title": "My Support Tickets",
+          "in_progress": "In Progress",
+          "new": "New Support Ticket",
+          "title_label": "Ticket Title",
+          "module_label": "Concerned Module",
+          "priority_label": "Priority",
+          "description_label": "Description",
+          "modules": {
+            "dashboard": "Dashboard",
+            "projects": "Projects",
+            "finances": "Finances",
+            "resources": "Resources",
+            "control": "Control",
+            "support": "Support"
+          },
+          "priorities": {
+            "low": "Low",
+            "medium": "Medium",
+            "high": "High",
+            "critical": "Critical"
+          },
+          "description_placeholder": "Describe precisely your problem or need...",
+          "success": "Ticket created successfully",
+          "error": "Error creating ticket"
+        },
+        "upload": {
+          "title": "Secure Document Archiving",
+          "folder_label": "Destination Folder",
+          "project_label": "Attached Project",
+          "no_project": "None (General Document)",
+          "name_label": "Document Name",
+          "description_label": "Description",
+          "description_placeholder": "Add a description to facilitate searching...",
+          "select_document": "Select Document",
+          "drag_drop": "Drag and drop or click to select",
+          "supported_formats": "Supported formats: PDF, DOC, XLS, JPG, PNG",
+          "max_size": "Maximum size: 10MB",
+          "success": "Document uploaded successfully",
+          "error_no_file": "Please select a file",
+          "error_no_name": "Please give a name to the document",
+          "error_upload": "Error uploading document",
+          "download": "Download started"
+        },
+        "contact": {
+          "title": "Contact Support",
+          "response_time": "Average response time",
+          "availability": "Availability",
+          "line": "Direct Line",
+          "location": "VAN BTP Support Douala / Yaoundé"
+        },
+        "help": {
+          "title": "Help Center",
+          "search_placeholder": "Search in help...",
+          "knowledge_base": "Knowledge Base",
+          "knowledge_desc": "Access user guides and video tutorials for VAN BTP ERP.",
+          "community": "Community & Feedback",
+          "community_desc": "Share your improvement suggestions and exchange with other users.",
+          "consult_help": "Consult Help",
+          "join_forum": "Join Forum"
+        },
+        "actions": {
+          "rename": "Rename",
+          "move": "Move",
+          "archive": "Archive",
+          "delete": "Delete",
+          "view_history": "View History"
+        }
       },
       "settings": {
         "title": "System Settings",

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Button, Input, Modal, cn } from '../../components/ui';
+import { useTranslation } from 'react-i18next';
 import { 
   FileText, 
   Folder, 
@@ -36,11 +37,29 @@ import { useNotification } from '../../context/NotificationContext';
 import { documentService } from '../../services/document.service';
 
 export const SupportPage = () => {
+  const { t } = useTranslation();
   const { can } = usePermissions();
   const { role } = useUser();
   const { projects, tickets, addTicket, documents, addDocument } = useData();
   const { notify } = useNotification();
   const [activeTab, setActiveTab] = useState<'ged' | 'tickets' | 'referentials'>('ged');
+
+  // Fonctions pour calculer les vrais chiffres des documents
+  const getDocumentCountByType = (type: string) => {
+    return documents.filter(doc => {
+      const docType = doc.type || 'Autre';
+      if (type === 'plans_techniques') {
+        return docType === 'Plan' || docType === 'PDF';
+      } else if (type === 'contracts_markets') {
+        return docType === 'Contrat';
+      } else if (type === 'invoices_quotes') {
+        return docType === 'Facture' || docType === 'Excel';
+      } else if (type === 'site_photos') {
+        return docType === 'Image' || docType === 'Photo';
+      }
+      return false;
+    }).length;
+  };
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [uploadStep, setUploadStep] = useState(1);
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
@@ -56,8 +75,8 @@ export const SupportPage = () => {
 
   const [newTicket, setNewTicket] = useState({
     title: '',
-    module: 'Tableau de bord',
-    priority: 'Basse',
+    module: t('support.tickets.modules.dashboard'),
+    priority: t('support.tickets.priorities.low'),
     description: ''
   });
 
@@ -71,18 +90,18 @@ export const SupportPage = () => {
           priority: newTicket.priority,
           description: newTicket.description,
         });
-        notify(`Ticket "${newTicket.title}" créé avec succès.`, 'success', '/support');
+        notify(t('support.tickets.success'), 'success', '/support');
         setTicketStep(ticketStep + 1);
       } catch (err: any) {
-        notify(err.message || 'Erreur lors de la création du ticket.', 'error', '/support');
+        notify(err.message || t('support.tickets.error'), 'error', '/support');
       }
     } else {
       setIsTicketModalOpen(false);
       setTicketStep(1);
       setNewTicket({
         title: '',
-        module: 'Tableau de bord',
-        priority: 'Basse',
+        module: t('support.tickets.modules.dashboard'),
+        priority: t('support.tickets.priorities.low'),
         description: ''
       });
     }
@@ -91,14 +110,14 @@ export const SupportPage = () => {
   const handleDownload = (doc: any) => {
     const url = documentService.downloadUrl(doc.id);
     window.open(url, '_blank', 'noopener,noreferrer');
-    notify(`Téléchargement de "${doc.name}" lancé.`, 'info', '/support');
+    notify(t('support.upload.download'), 'info', '/support');
   };
 
   const [newDocument, setNewDocument] = useState({
     name: '',
     type: 'PDF',
     projectId: 0,
-    folder: 'Plans & Techniques',
+    folder: t('support.folders.plans_techniques'),
     description: '',
     size: '0 KB',
     file: null as File | null
@@ -108,25 +127,25 @@ export const SupportPage = () => {
     e.preventDefault();
     if (uploadStep === 1) {
       if (!newDocument.file) {
-        notify("Veuillez sélectionner un fichier.", 'error', '/support');
+        notify(t('support.upload.error_no_file'), 'error', '/support');
         return;
       }
       if (!newDocument.name) {
-        notify("Veuillez donner un nom au document.", 'error', '/support');
+        notify(t('support.upload.error_no_name'), 'error', '/support');
         return;
       }
       try {
         await addDocument({
           ...newDocument,
           type: newDocument.folder === 'Plans & Techniques' ? 'Plan'
-              : newDocument.folder === 'Rapports' ? 'Rapport'
-              : newDocument.folder === 'Contrats' ? 'Contrat'
-              : newDocument.folder === 'Factures' ? 'Facture'
+              : newDocument.folder === 'Contrats & Marchés' ? 'Contrat'
+              : newDocument.folder === 'Factures & Devis' ? 'Facture'
+              : newDocument.folder === 'Photos Chantier' ? 'Photo'
               : 'Autre',
         });
         setUploadStep(2);
       } catch (err: any) {
-        notify(err?.message || 'Erreur lors de l\'upload du document', 'error', '/support');
+        notify(err?.message || t('support.upload.error_upload'), 'error', '/support');
       }
     } else {
       setIsUploadModalOpen(false);
@@ -135,7 +154,7 @@ export const SupportPage = () => {
         name: '',
         type: 'PDF',
         projectId: 0,
-        folder: 'Plans & Techniques',
+        folder: t('support.folders.plans_techniques'),
         description: '',
         size: '0 KB',
         file: null
@@ -150,20 +169,20 @@ export const SupportPage = () => {
         <div>
           <div className="flex items-center gap-2 text-[var(--color-primary)] font-bold text-sm uppercase tracking-widest mb-2">
             <LifeBuoy className="w-4 h-4" />
-            <span>Support & GED</span>
+            <span>{t('support.ged')}</span>
           </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tighter">Centre de Ressources</h1>
-          <p className="text-slate-500 font-medium mt-1">Gestion documentaire, support technique et référentiels métiers</p>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tighter">{t('support.title')}</h1>
+          <p className="text-slate-500 font-medium mt-1">{t('support.subtitle')}</p>
         </div>
         <div className="flex flex-wrap gap-3">
           <Button variant="outline" onClick={() => setIsTicketModalOpen(true)} className="bg-white border-slate-200 h-12 px-6 font-bold">
             <MessageSquare className="w-5 h-5 mr-2" />
-            Ouvrir un Ticket Support
+            {t('support.open_ticket')}
           </Button>
           {(role === 'dg' || role === 'chef' || role === 'rh') && (
             <Button onClick={() => setIsUploadModalOpen(true)} className="shadow-lg shadow-blue-900/20 h-12 px-6 font-bold bg-[var(--color-primary)]">
               <Upload className="w-5 h-5 mr-2" />
-              Uploader un Document
+              {t('common.upload_document')}
             </Button>
           )}
         </div>
@@ -175,13 +194,13 @@ export const SupportPage = () => {
           active={activeTab === 'ged'} 
           onClick={() => setActiveTab('ged')} 
           icon={Folder} 
-          label="Gestion Documentaire (GED)" 
+          label={t('common.ged_management')} 
         />
         <TabButton 
           active={activeTab === 'tickets'} 
           onClick={() => setActiveTab('tickets')} 
           icon={MessageSquare} 
-          label="Support Technique" 
+          label={t('common.technical_support')} 
         />
       </div>
 
@@ -196,24 +215,24 @@ export const SupportPage = () => {
           >
             {/* Folder Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <FolderCard title="Plans & Techniques" count="124 fichiers" color="blue" />
-              <FolderCard title="Contrats & Marchés" count="42 fichiers" color="emerald" />
-              <FolderCard title="Factures & Devis" count="256 fichiers" color="orange" />
-              <FolderCard title="Photos Chantier" count="1,024 fichiers" color="purple" />
+              <FolderCard title={t('support.folders.plans_techniques')} count={`${getDocumentCountByType('plans_techniques')} fichiers`} color="blue" />
+              <FolderCard title={t('support.folders.contracts_markets')} count={`${getDocumentCountByType('contracts_markets')} fichiers`} color="emerald" />
+              <FolderCard title={t('support.folders.invoices_quotes')} count={`${getDocumentCountByType('invoices_quotes')} fichiers`} color="orange" />
+              <FolderCard title={t('support.folders.site_photos')} count={`${getDocumentCountByType('site_photos')} fichiers`} color="purple" />
             </div>
 
             {/* Recent Documents Table */}
             <Card className="border-none shadow-xl shadow-slate-200/50 overflow-hidden">
               <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <h3 className="text-lg font-black text-slate-900 tracking-tight">Derniers Documents Partagés</h3>
+                <h3 className="text-lg font-black text-slate-900 tracking-tight">{t('support.document_table.title')}</h3>
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input 
                       type="text" 
-                      placeholder="Rechercher un fichier..." 
+                      placeholder={t('support.search_placeholder')} 
                       value={docSearch}
-                      onChange={(e) => setDocSearch(e.target.value)}
+                      onChange={(e) => setDocSearch(e.target.value)} 
                       className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-[var(--color-primary)] w-64" 
                     />
                   </div>
@@ -223,12 +242,12 @@ export const SupportPage = () => {
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50/50 text-slate-400 font-black uppercase text-[10px] tracking-widest">
                     <tr>
-                      <th className="px-6 py-4 text-left">Nom du fichier</th>
-                      <th className="px-6 py-4 text-left">Type</th>
-                      <th className="px-6 py-4 text-left">Chantier</th>
-                      <th className="px-6 py-4 text-left">Date</th>
-                      <th className="px-6 py-4 text-left">Taille</th>
-                      <th className="px-6 py-4 text-right">Actions</th>
+                      <th className="px-6 py-4 text-left">{t('support.document_table.filename')}</th>
+                      <th className="px-6 py-4 text-left">{t('support.document_table.type')}</th>
+                      <th className="px-6 py-4 text-left">{t('support.document_table.project')}</th>
+                      <th className="px-6 py-4 text-left">{t('support.document_table.date')}</th>
+                      <th className="px-6 py-4 text-left">{t('support.document_table.size')}</th>
+                      <th className="px-6 py-4 text-right">{t('support.document_table.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -378,7 +397,7 @@ export const SupportPage = () => {
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-slate-700">Dossier Destination</label>
+                    <label className="text-sm font-bold text-slate-700">Type Dossier</label>
                     <select 
                       value={newDocument.folder}
                       onChange={(e) => setNewDocument({...newDocument, folder: e.target.value})}
@@ -600,35 +619,43 @@ export const SupportPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Type</p>
-                  <p className="text-sm font-black text-slate-900">{selectedDoc.type}</p>
+                  <p className="text-sm font-black text-slate-900">{selectedDoc.type || 'Non défini'}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Taille</p>
-                  <p className="text-sm font-black text-slate-900">{selectedDoc.size}</p>
+                  <p className="text-sm font-black text-slate-900">{selectedDoc.size || 'Non spécifiée'}</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Dernière Modif</p>
-                  <p className="text-sm font-black text-slate-900">{selectedDoc.date}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Statut Visa</p>
-                  <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase">Validé</span>
-                </div>
+                {selectedDoc.projectId && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Projet</p>
+                    <p className="text-sm font-black text-slate-900">{getProjectNameById(projects, selectedDoc.projectId)}</p>
+                  </div>
+                )}
+                {selectedDoc.uploadedBy && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Uploadé par</p>
+                    <p className="text-sm font-black text-slate-900">{selectedDoc.uploadedByRole || 'Utilisateur'}</p>
+                  </div>
+                )}
               </div>
 
-              <div className="p-6 bg-slate-50 rounded-2xl space-y-4">
-                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Historique des Versions</h4>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-xs font-bold">
-                    <span className="text-slate-700">v2.0 - Version Finale Signée</span>
-                    <span className="text-slate-400">12/04/2024</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs font-bold">
-                    <span className="text-slate-700">v1.0 - Brouillon Initial</span>
-                    <span className="text-slate-400">05/04/2024</span>
+              {selectedDoc.mimeType && (
+                <div className="p-6 bg-slate-50 rounded-2xl space-y-4">
+                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Informations Techniques</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Type MIME</p>
+                      <p className="text-sm font-black text-slate-900">{selectedDoc.mimeType}</p>
+                    </div>
+                    {selectedDoc.filePath && (
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Chemin Fichier</p>
+                        <p className="text-sm font-black text-slate-900 truncate">{selectedDoc.filePath}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
+              )}
 
               <div className="pt-6 border-t border-slate-100 flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setSelectedDoc(null)} className="font-bold">Fermer</Button>
@@ -657,17 +684,100 @@ export const SupportPage = () => {
       </Modal>
 
       {/* Document Viewer Modal */}
-      <Modal isOpen={isViewerModalOpen} onClose={() => setIsViewerModalOpen(false)} title="Visionneuse Document" size="full">
+      <Modal isOpen={isViewerModalOpen} onClose={() => setIsViewerModalOpen(false)} title={`Visionneuse: ${selectedDoc?.name || 'Document'}`} size="full">
         <div className="h-[80vh] flex flex-col">
-          <div className="flex-1 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 font-black">
-            Aperçu du document (Visionneuse plein écran)
+          <div className="flex-1 bg-slate-100 rounded-2xl overflow-hidden">
+            {selectedDoc && (
+              <div className="w-full h-full flex items-center justify-center p-4">
+                {/* Aperçu pour les images */}
+                {(selectedDoc.mimeType?.startsWith('image/') || selectedDoc.type?.toLowerCase().includes('photo')) && (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <img 
+                      src={`http://localhost:3001/uploads/documents/${selectedDoc.filePath || selectedDoc.name}`}
+                      alt={selectedDoc.name}
+                      className="max-w-full max-h-full object-contain shadow-lg"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const fallbackDiv = target.parentElement;
+                        if (fallbackDiv) {
+                          fallbackDiv.innerHTML = `
+                            <div class="flex flex-col items-center justify-center text-slate-400 p-8">
+                              <svg class="w-20 h-20 mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                              </svg>
+                              <h3 class="text-xl font-black mb-2">${selectedDoc.name}</h3>
+                              <p class="text-sm mb-4">Image non accessible</p>
+                              <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700" onclick="window.open('http://localhost:3001/uploads/documents/${selectedDoc.filePath || selectedDoc.name}', '_blank')">
+                                Ouvrir dans un nouvel onglet
+                              </button>
+                            </div>
+                          `;
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+                
+                {/* Aperçu pour les PDFs avec embed */}
+                {selectedDoc.mimeType === 'application/pdf' && (
+                  <div className="w-full h-full">
+                    <embed 
+                      src={`http://localhost:3001/uploads/documents/${selectedDoc.filePath || selectedDoc.name}#toolbar=0&navpanes=0&scrollbar=0`}
+                      type="application/pdf"
+                      className="w-full h-full"
+                    />
+                  </div>
+                )}
+                
+                {/* Fallback pour les autres types de fichiers */}
+                {!selectedDoc.mimeType?.startsWith('image/') && 
+                 selectedDoc.mimeType !== 'application/pdf' && 
+                 !selectedDoc.type?.toLowerCase().includes('photo') && (
+                  <div className="flex flex-col items-center justify-center text-slate-400 p-8">
+                    <FileText className="w-20 h-20 mb-6" />
+                    <h3 className="text-xl font-black mb-2">{selectedDoc.name}</h3>
+                    <p className="text-sm mb-4">Type: {selectedDoc.type || 'Non défini'}</p>
+                    <p className="text-sm mb-6">Taille: {selectedDoc.size || 'Non spécifiée'}</p>
+                    <div className="flex gap-3">
+                      <Button onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = `http://localhost:3001/uploads/documents/${selectedDoc.filePath || selectedDoc.name}`;
+                        link.download = selectedDoc.name;
+                        link.target = '_blank';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }}>
+                        <Download className="w-4 h-4 mr-2" />
+                        Télécharger
+                      </Button>
+                      <Button variant="outline" onClick={() => {
+                        window.open(`http://localhost:3001/uploads/documents/${selectedDoc.filePath || selectedDoc.name}`, '_blank');
+                      }}>
+                        <BookOpen className="w-4 h-4 mr-2" />
+                        Ouvrir
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex justify-center gap-4 p-4 border-t border-slate-100">
-            <Button variant="outline">Zoom -</Button>
-            <Button variant="outline">Zoom +</Button>
-            <Button variant="outline">Page Précédente</Button>
-            <Button variant="outline">Page Suivante</Button>
-            <Button>Ajouter Annotation</Button>
+            <Button variant="outline" onClick={() => window.location.reload()}>Actualiser</Button>
+            <Button onClick={() => {
+              const link = document.createElement('a');
+              link.href = `http://localhost:3001/uploads/documents/${selectedDoc?.filePath || selectedDoc?.name}`;
+              link.download = selectedDoc?.name;
+              link.target = '_blank';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }}>
+              <Download className="w-4 h-4 mr-2" />
+              Télécharger
+            </Button>
           </div>
         </div>
       </Modal>

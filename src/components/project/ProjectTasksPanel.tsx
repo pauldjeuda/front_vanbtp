@@ -188,7 +188,7 @@ export const ProjectTasksPanel: React.FC<Props> = ({ projectId, employees, canEd
                     <td className="px-4 py-3">
                       {canEdit && (
                         <div className="flex gap-1">
-                          <button onClick={() => openEdit(task)} className="text-slate-300 hover:text-[var(--color-primary)] p-1 transition-colors text-xs font-bold">✏</button>
+                          <button onClick={() => openEdit(task)} className="text-slate-300 hover:text-[var(--color-primary)] p-1 transition-colors text-xs font-bold rotate-45">✏</button>
                           <button onClick={() => handleDelete(task.id)} className="text-slate-300 hover:text-red-500 p-1 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
                       )}

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import { Project, Incident, Ticket } from '../types/models';
 import { authService } from '../services/auth.service';
+import { useUser } from './UserContext';
 import { projectService } from '../services/project.service';
 import { transactionService } from '../services/transaction.service';
 import { employeeService } from '../services/employee.service';
@@ -86,6 +87,7 @@ const statusProgressMap: Record<string, number> = {
 };
 
 export const DataProvider = ({ children }: { children: ReactNode }) => {
+  const { profile } = useUser();
   const [projects, setProjectsState] = useState<Project[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [incidents, setIncidents] = useState<any[]>([]);
@@ -719,7 +721,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       workDone: report.workDone || report.description || '',
       issuesEncountered: report.issuesEncountered || '',
       nextDayPlan: report.nextDayPlan || '',
-      workerCount: Number(report.workerCount || 0)
+      workerCount: Number(report.workerCount || 0),
+      reporterId: profile?.id,
+      reporter: profile?.name || profile?.email || 'Utilisateur'
     };
     const created = await dailyReportService.create(payload);
     setDailyReports((prev) => [normalizeDailyReport(created), ...prev]);

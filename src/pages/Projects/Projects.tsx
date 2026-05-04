@@ -85,6 +85,7 @@ export const ProjectsPage = () => {
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'personnel' | 'subcontracting' | 'tasks' | 'reports'>('info');
   const [isNewReportModalOpen, setIsNewReportModalOpen] = useState(false);
+  const [expandedReportId, setExpandedReportId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRegion, setSelectedRegion] = useState('Toutes les régions');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -1271,31 +1272,76 @@ export const ProjectsPage = () => {
                       {dailyReports
                         .filter(r => r.projectId === selectedProject.id)
                         .map((report) => (
-                          <div key={report.id} className="p-6 bg-white border border-slate-100 rounded-3xl flex items-center justify-between hover:shadow-xl hover:border-[var(--color-primary)] transition-all cursor-pointer group">
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-                              <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-[var(--color-primary)] group-hover:text-white transition-colors">
-                                <ClipboardList className="w-7 h-7" />
-                              </div>
-                              <div>
-                                <p className="font-black text-slate-900 text-lg tracking-tight">Rapport du {new Date(report.date).toLocaleDateString('fr-FR')}</p>
-                                <div className="flex items-center gap-4 mt-1">
-                                  <span className="text-xs text-slate-500 font-bold flex items-center"><User className="w-3 h-3 mr-1" /> {report.reporter}</span>
-                                  <span className="text-xs text-slate-500 font-bold flex items-center"><MapPin className="w-3 h-3 mr-1" /> {report.location}</span>
+                          <div key={report.id} className="bg-white border border-slate-100 rounded-3xl overflow-hidden hover:shadow-xl hover:border-[var(--color-primary)] transition-all">
+                            <div 
+                              className="p-6 flex items-center justify-between cursor-pointer group"
+                              onClick={() => setExpandedReportId(expandedReportId === report.id ? null : report.id)}
+                            >
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-6">
+                                <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-[var(--color-primary)] group-hover:text-white transition-colors">
+                                  <ClipboardList className="w-7 h-7" />
+                                </div>
+                                <div>
+                                  <p className="font-black text-slate-900 text-lg tracking-tight">Rapport du {new Date(report.date).toLocaleDateString('fr-FR')}</p>
+                                  <div className="flex items-center gap-4 mt-1">
+                                    <span className="text-xs text-slate-500 font-bold">{report.reporter}</span>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-                              <div className="text-right hidden md:block">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Météo</p>
-                                <p className="text-sm font-black text-slate-900">{report.weather}</p>
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-6">
+                                <span className={cn(
+                                  "text-xs font-black px-3 py-1 rounded-xl uppercase tracking-wider",
+                                  report.status === 'Validé' ? "text-emerald-600 bg-emerald-50" : "text-amber-600 bg-amber-50"
+                                )}>{report.status}</span>
+                                <ChevronRight className={cn(
+                                  "w-5 h-5 text-slate-300 transition-transform duration-200",
+                                  expandedReportId === report.id ? "rotate-90 text-[var(--color-primary)]" : "group-hover:text-[var(--color-primary)]"
+                                )} />
                               </div>
-                              <div className="w-px h-10 bg-slate-100 hidden md:block"></div>
-                              <span className={cn(
-                                "text-xs font-black px-3 py-1 rounded-xl uppercase tracking-wider",
-                                report.status === 'Validé' ? "text-emerald-600 bg-emerald-50" : "text-amber-600 bg-amber-50"
-                              )}>{report.status}</span>
-                              <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-[var(--color-primary)] transition-colors" />
                             </div>
+                            
+                            {/* Bloc déroulant des détails */}
+                            {expandedReportId === report.id && (
+                              <div className="px-6 pb-6 border-t border-slate-100 animate-in slide-in-from-top-2 duration-300">
+                                <div className="pt-6 space-y-4">
+                                  {/* Effectifs */}
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                      <p className="text-xs font-black text-slate-600 uppercase tracking-wider mb-2">Effectifs Présents</p>
+                                      <p className="text-lg font-black text-slate-900">{report.workerCount || 0} personnes</p>
+                                    </div>
+                                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                      <p className="text-xs font-black text-slate-600 uppercase tracking-wider mb-2">Date du Rapport</p>
+                                      <p className="text-lg font-black text-slate-900">{new Date(report.reportDate).toLocaleDateString('fr-FR')}</p>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Travaux Réalisés */}
+                                  {report.workDone && (
+                                    <div className="p-4 bg-white rounded-xl border border-slate-200">
+                                      <p className="text-xs font-black text-slate-600 uppercase tracking-wider mb-2">Travaux Réalisés</p>
+                                      <p className="text-sm font-medium text-slate-800 whitespace-pre-wrap">{report.workDone}</p>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Problèmes Rencontrés */}
+                                  {report.issuesEncountered && (
+                                    <div className="p-4 bg-white rounded-xl border border-slate-200">
+                                      <p className="text-xs font-black text-slate-600 uppercase tracking-wider mb-2">Problèmes Rencontrés</p>
+                                      <p className="text-sm font-medium text-slate-800 whitespace-pre-wrap">{report.issuesEncountered}</p>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Plan du Jour Suivant */}
+                                  {report.nextDayPlan && (
+                                    <div className="p-4 bg-white rounded-xl border border-slate-200">
+                                      <p className="text-xs font-black text-slate-600 uppercase tracking-wider mb-2">Plan du Jour Suivant</p>
+                                      <p className="text-sm font-medium text-slate-800 whitespace-pre-wrap">{report.nextDayPlan}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ))}
                       {dailyReports.filter(r => r.projectId === selectedProject.id).length === 0 && (
@@ -1769,20 +1815,40 @@ export const ProjectsPage = () => {
             title="Saisie Journal de Chantier"
             size="lg"
           >
-            <form className="space-y-6">
+            <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
               <div className="grid grid-cols-1 gap-4">
                 <Input label="Date du Jour" type="date" defaultValue={new Date().toISOString().split('T')[0]} />
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-slate-700">Effectifs Présents (VAN BTP + Sous-traitants)</label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Input placeholder="Ouvriers" type="number" min="0" />
-                  <Input placeholder="Engins" type="number" min="0" />
+                  <Input placeholder="Nombre d'ouvriers" type="number" min="0" id="workerCount" />
+                  <Input placeholder="Nombre d'engins" type="number" min="0" id="equipmentCount" />
                 </div>
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-slate-700">Travaux Réalisés (Tâches & PK)</label>
-                <textarea className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium h-32 focus:ring-2 focus:ring-[var(--color-primary)] outline-none" placeholder="Détaillez les activités du jour..."></textarea>
+                <textarea 
+                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium h-32 focus:ring-2 focus:ring-[var(--color-primary)] outline-none" 
+                  placeholder="Détaillez les activités du jour..."
+                  id="workDone"
+                ></textarea>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-slate-700">Problèmes Rencontrés</label>
+                <textarea 
+                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium h-24 focus:ring-2 focus:ring-[var(--color-primary)] outline-none" 
+                  placeholder="Décrivez les problèmes ou incidents..."
+                  id="issuesEncountered"
+                ></textarea>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-slate-700">Plan du Jour Suivant</label>
+                <textarea 
+                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium h-24 focus:ring-2 focus:ring-[var(--color-primary)] outline-none" 
+                  placeholder="Planifiez les activités de demain..."
+                  id="nextDayPlan"
+                ></textarea>
               </div>
               <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
                 <p className="text-xs font-bold text-amber-700">Note: Ce rapport sera transmis au Bureau de Contrôle pour visa contradictoire.</p>
@@ -1795,17 +1861,22 @@ export const ProjectsPage = () => {
                   onClick={async () => {
                     setIsSubmittingReport(true);
                     try {
+                      // Récupérer les valeurs du formulaire
+                      const workerCountEl = document.getElementById('workerCount') as HTMLInputElement;
+                      const workDoneEl = document.getElementById('workDone') as HTMLTextAreaElement;
+                      const issuesEncounteredEl = document.getElementById('issuesEncountered') as HTMLTextAreaElement;
+                      const nextDayPlanEl = document.getElementById('nextDayPlan') as HTMLTextAreaElement;
+                      
                       await addDailyReport({
                         reportDate: new Date().toISOString().split('T')[0],
                         projectId: selectedProject.id,
-                        weather: 'Ensoleillé',
                         // ENUM DB: Brouillon / Soumis / Validé
                         status: 'Soumis',
-                        workDone: '',
-                        issuesEncountered: '',
-                        nextDayPlan: '',
-                        workerCount: 0
-});
+                        workDone: workDoneEl?.value || '',
+                        issuesEncountered: issuesEncounteredEl?.value || '',
+                        nextDayPlan: nextDayPlanEl?.value || '',
+                        workerCount: parseInt(workerCountEl?.value || '0')
+                      });
                       addLog({
                         action: "Nouveau rapport journalier",
                         user: userName || "Utilisateur",

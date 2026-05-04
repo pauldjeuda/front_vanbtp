@@ -127,7 +127,7 @@ export const FinancesPage = () => {
     client: '', categorieFacture: 'Situation Travaux' as string, dueDate: '', description: '',
   });
   const [newPayment, setNewPayment] = useState({
-    projectId: projects[0]?.id || 0, client: '', amount: '',
+    projectId: projects.length > 0 ? projects[0].id : null, client: '', amount: '',
     date: today, method: 'Virement Bancaire',
   });
 
@@ -297,9 +297,16 @@ export const FinancesPage = () => {
     setIsSubmittingPayment(true);
 
     const amount = parseInt(newPayment.amount) || 0;
+    
+    // Validation des champs obligatoires
+    if (!newPayment.projectId || newPayment.projectId === 0 || !newPayment.date || !amount || amount <= 0) {
+      notify('Veuillez remplir tous les champs obligatoires (chantier, montant, date)', 'error');
+      setIsSubmittingPayment(false);
+      return;
+    }
+    
     try {
       await addTransaction({
-        date: newPayment.date,
         transactionDate: newPayment.date,
         projectId: newPayment.projectId,
         category: 'Encaissement', client: newPayment.client || 'Client',

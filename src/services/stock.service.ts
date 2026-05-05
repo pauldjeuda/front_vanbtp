@@ -3,7 +3,7 @@ import { api } from './api';
 export const stockService = {
   getAll: async (filters?: { projectId?: number; type?: string; warehouse?: string }) => {
     const params = new URLSearchParams();
-    if (filters?.projectId) params.set('projectId', String(filters.projectId));
+    if (filters?.projectId !== undefined) params.set('projectId', String(filters.projectId));
     if (filters?.type) params.set('type', filters.type);
     if (filters?.warehouse) params.set('warehouse', filters.warehouse);
     const res = await api.get<{ data: any[] }>(`/api/stock${params.toString() ? `?${params}` : ''}`);

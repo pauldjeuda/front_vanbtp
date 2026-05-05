@@ -204,6 +204,7 @@ export const ControlPage = () => {
           title: newAudit.type,
         auditDate: newAudit.date || new Date().toISOString().split('T')[0],
         auditor: newAudit.auditor,
+        location: newAudit.location,
         projectId: newAudit.projectId,
         status: 'Planifié',
         observations: newAudit.observations || '',
@@ -904,20 +905,47 @@ export const ControlPage = () => {
             </div>
 
             <div className="space-y-3">
-              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Objectifs & Points de Contrôle</h4>
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Détails & Observations</h4>
               <div className="space-y-2">
-                <div className="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-xl">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  <p className="text-xs font-bold text-slate-700">Vérification de la conformité des EPI sur site</p>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-xl">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  <p className="text-xs font-bold text-slate-700">Contrôle des certificats de conformité des matériaux</p>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-xl">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  <p className="text-xs font-bold text-slate-700">Audit de la gestion des déchets de chantier</p>
-                </div>
+                {selectedAudit.location && (
+                  <div className="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-xl">
+                    <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lieu / Zone</p>
+                      <p className="text-xs font-bold text-slate-700">{selectedAudit.location}</p>
+                    </div>
+                  </div>
+                )}
+                {selectedAudit.observations && (
+                  <div className="flex items-start gap-3 p-3 bg-white border border-slate-100 rounded-xl">
+                    <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0"></div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Observations</p>
+                      <p className="text-xs font-bold text-slate-700 whitespace-pre-wrap">{selectedAudit.observations}</p>
+                    </div>
+                  </div>
+                )}
+                {selectedAudit.recommendations && (
+                  <div className="flex items-start gap-3 p-3 bg-white border border-slate-100 rounded-xl">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0"></div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Recommandations</p>
+                      <p className="text-xs font-bold text-slate-700 whitespace-pre-wrap">{selectedAudit.recommendations}</p>
+                    </div>
+                  </div>
+                )}
+                {selectedAudit.score !== undefined && selectedAudit.score !== null && (
+                  <div className="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-xl">
+                    <div className="w-2 h-2 rounded-full bg-[var(--color-primary)] shrink-0"></div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Score</p>
+                      <p className="text-xs font-bold text-slate-700">{selectedAudit.score} / 100</p>
+                    </div>
+                  </div>
+                )}
+                {!selectedAudit.location && !selectedAudit.observations && !selectedAudit.recommendations && (selectedAudit.score === undefined || selectedAudit.score === null) && (
+                  <p className="text-xs text-slate-400 italic py-2">Aucun détail supplémentaire fourni.</p>
+                )}
               </div>
             </div>
 

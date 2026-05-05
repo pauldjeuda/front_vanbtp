@@ -10,6 +10,7 @@ import {
   Plus,
   Minus,
   ArrowRightLeft,
+  ArrowUpRight,
   History,
   AlertCircle,
   Search,
@@ -32,6 +33,25 @@ import { useHistory } from '../../context/HistoryContext';
 import { useData } from '../../context/DataContext';
 import { attendanceService } from '../../services/attendance.service';
 import { useNotification } from '../../context/NotificationContext';
+
+const itemUnits: Record<string, string> = {
+  'Ciment CPJ 35': 'Tonnes',
+  'Acier / Fer à béton': 'Tonnes',
+  'Pelles': 'Unités',
+  'Casques': 'Unités',
+  'Sable de Sanaga': 'm3',
+  'Gravier': 'm3',
+  'Gazole Chantier': 'L',
+  'EPI (Casques/Gilets)': 'Kits',
+  'Fer à béton 12mm': 'Barres',
+  'Brouettes': 'Unités',
+  'Gilets de sécurité': 'Unités',
+  'Bottes de chantier': 'Paires',
+  'Bitume': 'Tonnes',
+  'Adjuvant béton': 'L',
+  'Peinture Blanche': 'Bidons',
+  'Briques de terre cuite': 'Unités'
+};
 
 export const ResourcesPage = () => {
   const { can } = usePermissions();
@@ -76,8 +96,6 @@ export const ResourcesPage = () => {
   const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [purchaseStep, setPurchaseStep] = useState(1);
-  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
-  const [stockStep, setStockStep] = useState(1);
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
   const [isServiceProviderModalOpen, setIsServiceProviderModalOpen] = useState(false);
   const [newServiceProvider, setNewServiceProvider] = useState({
@@ -114,7 +132,12 @@ export const ResourcesPage = () => {
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<number | null>(null);
   const [stTab, setStTab] = useState<'contracts' | 'providers'>('contracts');
 
-  const getProjectNameById = (projectId?: number) => projects.find(p => p.id === projectId)?.name || 'Chantier inconnu';
+  const [stockView, setStockView] = useState<'warehouse' | 'projects'>('projects');
+
+  const getProjectNameById = (projectId?: number) => {
+    if (projectId === 0) return 'Magasin Central';
+    return projects.find(p => p.id === projectId)?.name || 'Chantier inconnu';
+  };
   const getProjectIdByName = (name?: string) => projects.find(p => p.name === name)?.id || 0;
   const { notify } = useNotification();
 
@@ -220,30 +243,46 @@ export const ResourcesPage = () => {
   ], []);
 
   const calculatedStock = React.useMemo(() => {
-    if (projects.length === 0) return [];
+    // Liste dynamique des articles basés sur les mouvements + liste de base
+    const dynamicItems = Array.from(new Set([
+      ...stockItems.map(i => i.name),
+      ...stockMovements.map(m => m.item)
+    ]));
 
-    return stockItems.map(item => {
-      const movements = stockMovements.filter(m =>
-        m.item === item.name &&
-        (selectedStockProject === null ? true : Number(m.projectId) === Number(selectedStockProject))
-      );
+    return dynamicItems.map(itemName => {
+      const baseItem = stockItems.find(i => i.name === itemName);
+      const itemUnit = baseItem?.unit || itemUnits[itemName] || 'Unités';
+      
+      const movements = stockMovements.filter(m => {
+        const matchItem = m.item === itemName;
+        if (stockView === 'warehouse') {
+          // Comparaison souple pour l'ID de projet
+          return matchItem && (m.projectId == 0 || m.projectId === null);
+        } else {
+          const matchProject = selectedStockProject === null 
+            ? (m.projectId != 0 && m.projectId !== null) 
+            : (Number(m.projectId) === Number(selectedStockProject));
+          return matchItem && matchProject;
+        }
+      });
 
       const total = movements.reduce((acc, m) => {
-        const qty = parseFloat(m.qty) || 0;
-        if (m.type === 'Entrée' || m.type === 'Entrée (Transfert)') return acc + qty;
-        if (m.type === 'Sortie' || m.type === 'Sortie (Transfert)') return acc - qty;
+        const qty = parseFloat(m.quantity || m.qty || 0);
+        if (m.type.startsWith('Entrée')) return acc + qty;
+        if (m.type.startsWith('Sortie') || m.type === 'Transfert') return acc - qty;
         return acc;
       }, 0);
 
       return {
-        title: item.name,
-        qty: `${total.toLocaleString()} ${item.unit}`,
+        title: itemName,
+        qty: `${total.toLocaleString()} ${itemUnit}`,
+        totalQty: total, // Stocker le nombre brut pour les calculs de KPI
         status: total === 0 ? 'Vide' : total > 100 ? 'Normal' : total > 20 ? 'Bas' : 'Critique',
-        icon: item.icon,
-        color: item.color
+        icon: baseItem?.icon || Package,
+        color: baseItem?.color || 'blue'
       };
     });
-  }, [stockMovements, selectedStockProject, projects, stockItems]);
+  }, [stockMovements, selectedStockProject, projects, stockItems, stockView]);
 
   const [newPurchase, setNewPurchase] = useState({
     item: 'Ciment CPJ 35',
@@ -271,22 +310,7 @@ export const ResourcesPage = () => {
   });
 
 
-  const itemUnits: Record<string, string> = {
-    'Ciment CPJ 35': 'Tonnes',
-    'Acier / Fer à béton': 'Tonnes',
-    'Pelles': 'Unités',
-    'Casques': 'Unités',
-    'Sable de Sanaga': 'm3',
-    'Gravier': 'm3',
-    'Gazole Chantier': 'L',
-    'EPI (Casques/Gilets)': 'Kits',
-    'Fer à béton 12mm': 'Barres',
-    'Brouettes': 'Unités',
-    'Gilets de sécurité': 'Unités',
-    'Bottes de chantier': 'Paires',
-    'Bitume': 'Tonnes',
-    'Adjuvant béton': 'L'
-  };
+
 
   const handlePurchaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -440,69 +464,7 @@ export const ResourcesPage = () => {
     (selectedProjectFilter === null || emp.projectId === selectedProjectFilter)
   );
 
-  const handleStockSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (stockStep < 2) {
-      setStockStep(stockStep + 1);
-    } else {
-      // Validation de la quantité
-      const qty = Number(newStockMovement.qty);
-      if (!qty || qty <= 0) {
-        notify('La quantité doit être supérieure à 0 pour une sortie de stock.', 'error', '/resources');
-        return;
-      }
 
-      // Vérification du solde pour une Sortie
-      const mvtType = stockMovementType === 'entry' ? 'Entrée' : stockMovementType === 'exit' ? 'Sortie' : 'Transfert';
-      if (mvtType === 'Sortie' || mvtType === 'Transfert') {
-        // Pour une sortie, on vérifie le stock dans le projet d'origine
-        const projectId = stockMovementType === 'exit' ? newStockMovement.fromProjectId : newStockMovement.fromProjectId;
-        const itemMvts = stockMovements.filter(
-          (m: any) => m.item === newStockMovement.item && Number(m.projectId) === Number(projectId)
-        );
-        const totalE = itemMvts.filter((m: any) => m.type === 'Entrée').reduce((s: number, m: any) => s + Number(m.qty || m.quantity || 0), 0);
-        const totalS = itemMvts.filter((m: any) => m.type === 'Sortie' || m.type === 'Sortie (Transfert)').reduce((s: number, m: any) => s + Number(m.qty || m.quantity || 0), 0);
-        const soldeDispo = totalE - totalS;
-        if (qty > soldeDispo) {
-          notify(
-            `Stock insuffisant pour "${newStockMovement.item}" dans ${getProjectNameById(projectId)} : ${Math.max(0, soldeDispo)} disponible(s), ${qty} demandé(s).`,
-            'error', '/resources'
-          );
-          return;
-        }
-      }
-
-      addStockMovement({
-        date: new Date().toLocaleString('fr-FR'),
-        type: 'Sortie',
-        item: newStockMovement.item,
-        qty: newStockMovement.qty,
-        unit: newStockMovement.unit,
-        projectId: newStockMovement.toProjectId,
-        user: name || 'Utilisateur'
-      });
-      addLog({
-        module: 'Ressources',
-        action: `Sortie de stock: ${newStockMovement.item} (${newStockMovement.qty}) vers ${projects.find(p => p.id === newStockMovement.toProjectId)?.name || 'Chantier inconnu'}`,
-        user: name || 'Utilisateur',
-        type: 'warning'
-      });
-      setIsStockModalOpen(false);
-      setStockStep(1);
-      setNewStockMovement({
-        item: 'Ciment CPJ 35',
-        qty: '',
-        unit: 'Tonnes',
-        fromProjectId: projects[0]?.id || 0,
-        toProjectId: projects[0]?.id || 0,
-        chantier: projects[0]?.name || '',
-        fromChantier: projects[0]?.name || '',
-        toChantier: projects[0]?.name || '',
-        receiver: '',
-        docRef: ''
-      });
-    }
-  };
 
 
   const handleAddEmployee = async (emp: any) => {
@@ -573,12 +535,22 @@ export const ResourcesPage = () => {
     const items = Array.from(new Set(stockMovements.map((m: any) => m.item))).filter(Boolean);
 
     items.forEach(item => {
-      const itemMovements = stockMovements.filter((m: any) => m.item === item);
+      const itemMovements = stockMovements.filter((m: any) => {
+        const matchItem = m.item === item;
+        if (stockView === 'warehouse') {
+          return matchItem && (m.projectId == 0 || m.projectId === null);
+        } else {
+          const matchProject = selectedStockProject === null 
+            ? (m.projectId != 0 && m.projectId !== null) 
+            : (Number(m.projectId) === Number(selectedStockProject));
+          return matchItem && matchProject;
+        }
+      });
       const totalEntries = itemMovements
-        .filter((m: any) => m.type === 'Entrée')
+        .filter((m: any) => m.type.startsWith('Entrée'))
         .reduce((sum: number, m: any) => sum + Number(m.qty || m.quantity || 0), 0);
       const totalExits = itemMovements
-        .filter((m: any) => m.type === 'Sortie')
+        .filter((m: any) => m.type.startsWith('Sortie') || m.type === 'Transfert')
         .reduce((sum: number, m: any) => sum + Number(m.qty || m.quantity || 0), 0);
 
       const unit = itemMovements[0]?.unit || 'unités';
@@ -635,7 +607,7 @@ export const ResourcesPage = () => {
     if (logbookFilters.type !== 'all') {
       const typeMap: Record<string, string[]> = {
         'entries': ['Entrée', 'Entrées (Réceptions)'],
-        'exits': ['Sortie', 'Sorties (Consommations)']
+        'exits': ['Sortie', 'Sorties (Consommations)', 'Transfert']
       };
       filtered = filtered.filter((log: any) =>
         typeMap[logbookFilters.type]?.includes(log.type)
@@ -752,7 +724,7 @@ export const ResourcesPage = () => {
       setSelectedContract({ ...contract, tasks: updatedTasks, progress });
     }
   };
-  
+
   const handleServiceProviderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newServiceProvider.name || !newServiceProvider.projectId || !newServiceProvider.totalCost) {
@@ -789,12 +761,12 @@ export const ResourcesPage = () => {
 
   const handlePayProvider = async (provider: any) => {
     if (provider.paymentStatus === 'Payé') return;
-    
+
     if (window.confirm(`Confirmer le paiement de ${Number(provider.montant).toLocaleString()} FCFA à ${provider.company} ?`)) {
       try {
         // 1. Mettre à jour le statut du prestataire
         await updateSubcontract(provider.id, { paymentStatus: 'Payé' });
-        
+
         // 2. Enregistrer la dépense dans les finances
         await addTransaction({
           type: 'expense',
@@ -846,51 +818,52 @@ export const ResourcesPage = () => {
 
       if (stockMovementType === 'transfer') {
         // Validation des projets pour les transferts
-        if (!newStockMovement.fromProjectId || Number(newStockMovement.fromProjectId) === 0) {
-          notify('Veuillez sélectionner un projet source valide pour le transfert.', 'error', '/resources');
-          return;
+        // En mode warehouse, l'un des deux peut être 0 (Magasin Central)
+        const fromId = Number(newStockMovement.fromProjectId);
+        const toId = Number(newStockMovement.toProjectId);
+
+        if (stockView === 'projects') {
+          if (fromId === 0) { notify('Veuillez sélectionner un projet source valide.', 'error', '/resources'); return; }
+          if (toId === 0) { notify('Veuillez sélectionner un projet destination valide.', 'error', '/resources'); return; }
         }
-        if (!newStockMovement.toProjectId || Number(newStockMovement.toProjectId) === 0) {
-          notify('Veuillez sélectionner un projet destination valide pour le transfert.', 'error', '/resources');
-          return;
-        }
-        if (newStockMovement.fromProjectId === newStockMovement.toProjectId) {
-          notify('Les projets source et destination doivent être différents.', 'error', '/resources');
+
+        if (fromId === toId) {
+          notify('Les sites source et destination doivent être différents.', 'error', '/resources');
           return;
         }
 
         projectLabel = `${getProjectNameById(newStockMovement.fromProjectId)} -> ${getProjectNameById(newStockMovement.toProjectId)}`;
-        // Sortie du projet source
-        await addStockMovement({
-          movementDate: new Date().toISOString().split('T')[0],
-          type: 'Sortie',
-          item: newStockMovement.item,
-          quantity: Number(newStockMovement.qty || 0),
-          unit: newStockMovement.unit,
-          projectId: newStockMovement.fromProjectId,
-          note: `Transfert vers ${getProjectNameById(newStockMovement.toProjectId)}`
-        });
-        // Entrée dans le projet destination
-        await addStockMovement({
-          movementDate: new Date().toISOString().split('T')[0],
-          type: 'Entrée',
-          item: newStockMovement.item,
-          quantity: Number(newStockMovement.qty || 0),
-          unit: newStockMovement.unit,
-          projectId: newStockMovement.toProjectId,
-          note: `Transfert depuis ${getProjectNameById(newStockMovement.fromProjectId)}`
-        });
+
+        try {
+          // Un seul appel pour le transfert atomique (Sortie + Entrée gérées par le backend)
+          await addStockMovement({
+            movementDate: new Date().toISOString().split('T')[0],
+            type: 'Transfert',
+            item: newStockMovement.item,
+            quantity: Number(newStockMovement.qty || 0),
+            unit: newStockMovement.unit,
+            projectId: newStockMovement.fromProjectId,
+            toProjectId: newStockMovement.toProjectId,
+            note: `Transfert vers ${getProjectNameById(newStockMovement.toProjectId)}`
+          });
+        } catch (err: any) {
+          if (err?.message?.includes('Stock insuffisant') || err?.message?.includes('insufficient stock')) {
+            setStockMovementError(err.message);
+            setStockMovementStep(2);
+            return;
+          }
+          notify(err?.message || 'Erreur lors du transfert', 'error', '/resources');
+          return;
+        }
       } else {
         const typeLabel = stockMovementType === 'entry' ? 'Entrée' : 'Sortie';
-        projectLabel = stockMovementType === 'entry'
-          ? (Number(newStockMovement.toProjectId) === 0 ? "Magasin Central" : getProjectNameById(newStockMovement.toProjectId))
-          : (Number(newStockMovement.fromProjectId) === 0 ? "Magasin Central" : getProjectNameById(newStockMovement.fromProjectId));
-
         const effectiveProjectId = stockMovementType === 'entry' ? newStockMovement.toProjectId : newStockMovement.fromProjectId;
 
-        // Validation des champs obligatoires
-        if (!effectiveProjectId || Number(effectiveProjectId) === 0) {
-          notify('Veuillez sélectionner un projet valide pour le mouvement de stock.', 'error', '/resources');
+        projectLabel = getProjectNameById(effectiveProjectId);
+
+        // Validation: En mode projet, on ne veut pas de 0. En mode warehouse, on veut bien du 0.
+        if (stockView === 'projects' && Number(effectiveProjectId) === 0) {
+          notify('Veuillez sélectionner un projet valide.', 'error', '/resources');
           return;
         }
 
@@ -904,14 +877,12 @@ export const ResourcesPage = () => {
             projectId: Number(effectiveProjectId)
           });
         } catch (err: any) {
-          // Gérer les erreurs de stock insuffisant
           if (err?.message?.includes('Stock insuffisant') || err?.message?.includes('insufficient stock')) {
             setStockMovementError(err.message);
-            setStockMovementStep(2); // Afficher l'étape d'erreur
+            setStockMovementStep(2);
             return;
           }
-          // Gérer les autres erreurs
-          notify(err?.message || 'Erreur lors de l\'enregistrement du mouvement de stock', 'error', '/resources');
+          notify(err?.message || 'Erreur lors du mouvement', 'error', '/resources');
           return;
         }
       }
@@ -1130,23 +1101,51 @@ export const ResourcesPage = () => {
 
           {activeTab === 'stock' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              {/* Sélecteur de vue Stock */}
+              <div className="flex bg-slate-200/50 p-1 rounded-xl w-fit">
+                <button
+                  onClick={() => { setStockView('projects'); setSelectedStockProject(null); }}
+                  className={cn(
+                    "px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all",
+                    stockView === 'projects' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  )}
+                >
+                  Stocks Chantiers
+                </button>
+                <button
+                  onClick={() => { setStockView('warehouse'); setSelectedStockProject(null); }}
+                  className={cn(
+                    "px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all",
+                    stockView === 'warehouse' ? "bg-[var(--color-primary)] text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  )}
+                >
+                  Magasin Central (Entrepôt)
+                </button>
+              </div>
+
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
-                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Stocks Chantiers & Logistique</h3>
-                  <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Suivi du matériel et consommables chantiers</p>
+                  <h3 className="text-xl font-black text-slate-900 tracking-tight">
+                    {stockView === 'warehouse' ? 'Gestion de l\'Entrepôt Central' : 'Stocks Chantiers & Logistique'}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+                    {stockView === 'warehouse' ? 'Inventaire des stocks de réserve et transit' : 'Suivi du matériel et consommables chantiers'}
+                  </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <Filter className="w-3 h-3 text-slate-400" />
-                    <select
-                      value={selectedStockProject ?? ''}
-                      onChange={(e) => setSelectedStockProject(e.target.value ? Number(e.target.value) : null)}
-                      className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-transparent outline-none cursor-pointer hover:text-[var(--color-primary)] transition-colors"
-                    >
-                      <option value="">Tous les chantiers</option>
-                      {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                  </div>
+                  {stockView === 'projects' && (
+                    <div className="flex items-center gap-2">
+                      <Filter className="w-3 h-3 text-slate-400" />
+                      <select
+                        value={selectedStockProject ?? ''}
+                        onChange={(e) => setSelectedStockProject(e.target.value ? Number(e.target.value) : null)}
+                        className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-transparent outline-none cursor-pointer hover:text-[var(--color-primary)] transition-colors"
+                      >
+                        <option value="">Tous les chantiers</option>
+                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    </div>
+                  )}
                   <div className="relative flex-1 min-w-[180px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
@@ -1174,19 +1173,22 @@ export const ResourcesPage = () => {
                 ) : (
                   <div className="lg:col-span-4 py-12 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
                     <Package className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                    <p className="text-slate-400 font-bold">Aucun chantier actif. Le stock est vide.</p>
+                    <p className="text-slate-400 font-bold">Aucun stock disponible dans cette vue.</p>
                   </div>
                 )}
               </div>
 
               <Card className="p-8 border-none shadow-xl shadow-slate-200/50">
                 <div className="flex items-center justify-between mb-8">
-                  <h3 className="text-lg font-black text-slate-900 tracking-tight">Mouvements de Stock Récents</h3>
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight">Journal {stockView === 'warehouse' ? 'Entrepôt' : 'Chantiers'}</h3>
                   <Button variant="outline" size="sm" className="font-bold" onClick={() => setIsFullLogbookModalOpen(true)}>Journal Complet</Button>
                 </div>
                 <div className="space-y-4">
                   {stockMovements
-                    .filter(m => selectedStockProject === null || m.projectId === selectedStockProject)
+                    .filter(m => {
+                      if (stockView === 'warehouse') return Number(m.projectId) === 0;
+                      return selectedStockProject === null ? Number(m.projectId) !== 0 : Number(m.projectId) === selectedStockProject;
+                    })
                     .slice(0, 5).map((movement, i) => (
                       <div key={`movement-${i}`} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -1198,7 +1200,9 @@ export const ResourcesPage = () => {
                           </div>
                           <div>
                             <p className="text-sm font-black text-slate-900">{movement.type} Stock - {movement.item}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{getProjectNameById(movement.projectId)} • Par: {movement.user}</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                              {getProjectNameById(movement.projectId)} • Par: {movement.user}
+                            </p>
                           </div>
                         </div>
                         <div className="text-right">
@@ -1467,7 +1471,7 @@ export const ResourcesPage = () => {
                     <Plus className="w-4 h-4 mr-2" /> Nouveau Contrat ST
                   </Button>
                 ) : (
-                  <Button 
+                  <Button
                     onClick={() => setIsServiceProviderModalOpen(true)}
                     className="font-bold shadow-lg shadow-blue-900/10"
                   >
@@ -1607,8 +1611,8 @@ export const ResourcesPage = () => {
                                 <td className="px-6 py-4">
                                   <span className={cn(
                                     "px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-full border flex items-center gap-1.5 w-fit",
-                                    provider.paymentStatus === 'Payé' 
-                                      ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
+                                    provider.paymentStatus === 'Payé'
+                                      ? "bg-emerald-50 text-emerald-600 border-emerald-100"
                                       : "bg-amber-50 text-amber-600 border-amber-100"
                                   )}>
                                     <span className={cn("w-1.5 h-1.5 rounded-full", provider.paymentStatus === 'Payé' ? "bg-emerald-500" : "bg-amber-500")} />
@@ -1837,100 +1841,7 @@ export const ResourcesPage = () => {
         </div>
       </Modal>
 
-      {/* Stock Modal (Workflow) */}
-      <Modal
-        isOpen={isStockModalOpen}
-        onClose={() => setIsStockModalOpen(false)}
-        title="Bon de Sortie Magasin (BSM)"
-      >
-        <div className="space-y-8">
-          <div className="flex items-center justify-between px-12 relative">
-            <div className="absolute top-1/2 left-12 right-12 h-0.5 bg-slate-100 -translate-y-1/2 z-0"></div>
-            {[1, 2].map((s) => (
-              <div key={s} className={cn(
-                "w-10 h-10 rounded-full flex items-center justify-center font-black text-sm z-10 transition-all",
-                stockStep >= s ? "bg-[var(--color-primary)] text-white shadow-lg shadow-blue-900/20" : "bg-white border-2 border-slate-100 text-slate-300"
-              )}>
-                {s}
-              </div>
-            ))}
-          </div>
 
-          <form onSubmit={handleStockSubmit} className="space-y-6">
-            {stockStep === 1 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-slate-700">Article à sortir</label>
-                  <select
-                    value={newStockMovement.item}
-                    onChange={(e) => setNewStockMovement({ ...newStockMovement, item: e.target.value })}
-                    className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  >
-                    <option>Ciment CPJ 35 (Stock: 850 sacs)</option>
-                    <option>Gazole (Stock: 5,000 L)</option>
-                    <option>EPI (Stock: 120 kits)</option>
-                  </select>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input
-                    label="Quantité Sortie"
-                    type="number" min="0"
-                    placeholder="0"
-                    required
-                    value={newStockMovement.qty}
-                    onChange={(e) => setNewStockMovement({ ...newStockMovement, qty: e.target.value })}
-                  />
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-slate-700">Chantier Affecté</label>
-                    <select
-                      value={newStockMovement.toProjectId}
-                      onChange={(e) => { const toProjectId = Number(e.target.value); setNewStockMovement({ ...newStockMovement, toProjectId, chantier: getProjectNameById(toProjectId), toChantier: getProjectNameById(toProjectId) }); }}
-                      className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    >
-                      {projects.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <Input
-                  label="Nom du Réceptionnaire"
-                  placeholder="Ex: Jean Ebollo"
-                  required
-                  value={newStockMovement.receiver}
-                  onChange={(e) => setNewStockMovement({ ...newStockMovement, receiver: e.target.value })}
-                />
-              </div>
-            )}
-
-            {stockStep === 2 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 text-center py-8">
-                <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Package className="w-10 h-10" />
-                </div>
-                <h4 className="text-2xl font-black text-slate-900 tracking-tight">Bon de Sortie Validé</h4>
-                <p className="text-slate-500 font-medium max-w-xs mx-auto">Le stock a été décompté et le bon de sortie a été généré pour signature.</p>
-              </div>
-            )}
-
-            <div className="pt-6 border-t border-slate-100 flex justify-between">
-              <Button variant="outline" type="button" onClick={() => {
-                if (stockStep > 1) {
-                  setStockStep(1);
-                } else {
-                  setIsStockModalOpen(false);
-                  setStockStep(1);
-                }
-              }} className="font-bold">
-                {stockStep === 1 ? 'Annuler' : 'Fermer'}
-              </Button>
-              <Button type="submit" className="px-8 font-bold shadow-lg shadow-blue-900/20">
-                {stockStep === 2 ? 'Fermer' : 'Générer le BSM'}
-              </Button>
-            </div>
-          </form>
-        </div>
-      </Modal>
 
       {/* Employee Modal (Workflow) */}
       <Modal
@@ -2013,13 +1924,13 @@ export const ResourcesPage = () => {
             </div>
           </div>
 
-            <div className="pt-6 border-t border-slate-100 flex justify-between items-center">
-            <Button 
-              variant="ghost" 
+          <div className="pt-6 border-t border-slate-100 flex justify-between items-center">
+            <Button
+              variant="ghost"
               onClick={() => {
                 setIsEmployeeModalOpen(false);
                 setIsServiceProviderModalOpen(true);
-              }} 
+              }}
               className="text-xs font-bold text-blue-600 hover:bg-blue-50"
             >
               Ajouter un prestataire
@@ -2105,7 +2016,7 @@ export const ResourcesPage = () => {
                   <Plus className="w-3.5 h-3.5 mr-1.5" /> Ajouter une tâche
                 </Button>
               </div>
-              
+
               <div className="p-5 bg-slate-50 border-2 border-slate-100 rounded-3xl space-y-3 min-h-[320px] max-h-[400px] overflow-y-auto">
                 {newServiceProvider.tasks.map((task, idx) => (
                   <div key={idx} className="flex gap-2 group animate-in slide-in-from-right-2 duration-200">
@@ -2138,7 +2049,7 @@ export const ResourcesPage = () => {
                     </Button>
                   </div>
                 ))}
-                
+
                 {newServiceProvider.tasks.length === 0 && (
                   <div className="h-full flex flex-col items-center justify-center py-12 text-center space-y-3">
                     <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-slate-100">
@@ -2155,16 +2066,16 @@ export const ResourcesPage = () => {
           </div>
 
           <div className="pt-8 border-t border-slate-100 flex justify-end gap-4">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => setIsServiceProviderModalOpen(false)} 
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsServiceProviderModalOpen(false)}
               className="px-6 h-12 font-bold text-slate-500 border-slate-200 rounded-xl hover:bg-slate-50"
             >
               Annuler
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="px-10 h-12 font-black uppercase tracking-[0.15em] text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xl shadow-blue-200 transition-all active:scale-95"
             >
               Enregistrer le prestataire
@@ -2336,33 +2247,74 @@ export const ResourcesPage = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     <button
                       type="button"
-                      onClick={() => setStockMovementType('entry')}
+                      onClick={() => {
+                        setStockMovementType('entry');
+                        if (stockView === 'warehouse') {
+                          setNewStockMovement(prev => ({ ...prev, toProjectId: 0, chantier: 'Magasin Central' }));
+                        }
+                      }}
                       className={cn(
                         "p-4 border-2 rounded-2xl font-black text-[10px] uppercase tracking-widest flex flex-col items-center justify-center gap-2 transition-all",
                         stockMovementType === 'entry' ? "bg-emerald-50 border-emerald-500 text-emerald-700 shadow-md" : "bg-white border-slate-100 text-slate-400 hover:border-slate-200"
                       )}
                     >
-                      <Plus className="w-5 h-5" /> Entrée
+                      <Plus className="w-5 h-5" /> {stockView === 'warehouse' ? 'Entrée Magasin' : 'Entrée'}
                     </button>
+
+                    {stockView === 'projects' ? (
+                      <button
+                        type="button"
+                        onClick={() => setStockMovementType('exit')}
+                        className={cn(
+                          "p-4 border-2 rounded-2xl font-black text-[10px] uppercase tracking-widest flex flex-col items-center justify-center gap-2 transition-all",
+                          stockMovementType === 'exit' ? "bg-red-50 border-red-500 text-red-700 shadow-md" : "bg-white border-slate-100 text-slate-400 hover:border-slate-200"
+                        )}
+                      >
+                        <Minus className="w-5 h-5" /> Sortie
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStockMovementType('transfer');
+                          setNewStockMovement(prev => ({ 
+                            ...prev, 
+                            fromProjectId: 0, 
+                            fromChantier: 'Magasin Central',
+                            toProjectId: projects[0]?.id || 0, // Reset destination to a real project
+                            toChantier: projects[0]?.name || ''
+                          }));
+                        }}
+                        className={cn(
+                          "p-4 border-2 rounded-2xl font-black text-[10px] uppercase tracking-widest flex flex-col items-center justify-center gap-2 transition-all",
+                          stockMovementType === 'transfer' && newStockMovement.fromProjectId === 0 && newStockMovement.toProjectId !== 0 ? "bg-blue-50 border-blue-500 text-blue-700 shadow-md" : "bg-white border-slate-100 text-slate-400 hover:border-slate-200"
+                        )}
+                      >
+                        <ArrowUpRight className="w-5 h-5" /> Transfert vers Chantier
+                      </button>
+                    )}
+
                     <button
                       type="button"
-                      onClick={() => setStockMovementType('exit')}
+                      onClick={() => {
+                        setStockMovementType('transfer');
+                        if (stockView === 'warehouse') {
+                          setNewStockMovement(prev => ({ 
+                            ...prev, 
+                            toProjectId: 0, 
+                            toChantier: 'Magasin Central', 
+                            chantier: 'Magasin Central',
+                            fromProjectId: projects[0]?.id || 0, // Reset source to a real project
+                            fromChantier: projects[0]?.name || ''
+                          }));
+                        }
+                      }}
                       className={cn(
                         "p-4 border-2 rounded-2xl font-black text-[10px] uppercase tracking-widest flex flex-col items-center justify-center gap-2 transition-all",
-                        stockMovementType === 'exit' ? "bg-red-50 border-red-500 text-red-700 shadow-md" : "bg-white border-slate-100 text-slate-400 hover:border-slate-200"
+                        stockMovementType === 'transfer' && (stockView === 'projects' || (stockView === 'warehouse' && newStockMovement.toProjectId === 0)) ? "bg-blue-50 border-blue-500 text-blue-700 shadow-md" : "bg-white border-slate-100 text-slate-400 hover:border-slate-200"
                       )}
                     >
-                      <Minus className="w-5 h-5" /> Sortie
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setStockMovementType('transfer')}
-                      className={cn(
-                        "p-4 border-2 rounded-2xl font-black text-[10px] uppercase tracking-widest flex flex-col items-center justify-center gap-2 transition-all",
-                        stockMovementType === 'transfer' ? "bg-blue-50 border-blue-500 text-blue-700 shadow-md" : "bg-white border-slate-100 text-slate-400 hover:border-slate-200"
-                      )}
-                    >
-                      <Truck className="w-5 h-5" /> Transfert
+                      <Truck className="w-5 h-5" /> {stockView === 'warehouse' ? 'Retour Chantier' : 'Transfert'}
                     </button>
                   </div>
                 </div>
@@ -2383,11 +2335,7 @@ export const ResourcesPage = () => {
                         }}
                         className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                       >
-                        <option>Ciment CPJ 35</option>
-                        <option>Sable de Sanaga</option>
-                        <option>Gazole Chantier</option>
-                        <option>EPI (Casques/Gilets)</option>
-                        <option>Fer à béton 12mm</option>
+                        {Object.keys(itemUnits).map(item => <option key={item} value={item}>{item}</option>)}
                       </select>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2406,27 +2354,39 @@ export const ResourcesPage = () => {
                   <div className="space-y-4">
                     {(stockMovementType === 'exit' || stockMovementType === 'transfer') && (
                       <div className="space-y-1.5">
-                        <label className="text-sm font-bold text-slate-700">Chantier d'Origine</label>
+                        <label className="text-sm font-bold text-slate-700">Source</label>
                         <select
                           value={newStockMovement.fromProjectId}
+                          disabled={stockView === 'warehouse' && stockMovementType === 'transfer' && newStockMovement.fromProjectId === 0}
                           onChange={(e) => { const fromProjectId = Number(e.target.value); setNewStockMovement({ ...newStockMovement, fromProjectId, fromChantier: getProjectNameById(fromProjectId) }); }}
-                          className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                          className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:opacity-60"
                           required
                         >
-                          {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                          {/* En mode transfert vers chantier, la source est forcée à 0, donc on affiche que ça. En mode retour chantier, la source doit être un chantier. */}
+                          {stockView === 'warehouse' && stockMovementType === 'transfer' && newStockMovement.fromProjectId === 0 ? (
+                            <option value={0}>Magasin Central</option>
+                          ) : (
+                            projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)
+                          )}
                         </select>
                       </div>
                     )}
                     {(stockMovementType === 'entry' || stockMovementType === 'transfer') && (
                       <div className="space-y-1.5">
-                        <label className="text-sm font-bold text-slate-700">Chantier de Destination</label>
+                        <label className="text-sm font-bold text-slate-700">Destination</label>
                         <select
                           value={newStockMovement.toProjectId}
+                          disabled={stockView === 'warehouse' && (stockMovementType === 'entry' || newStockMovement.toProjectId === 0)}
                           onChange={(e) => { const toProjectId = Number(e.target.value); setNewStockMovement({ ...newStockMovement, toProjectId, chantier: getProjectNameById(toProjectId), toChantier: getProjectNameById(toProjectId) }); }}
-                          className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                          className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:opacity-60"
                           required
                         >
-                          {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                          {/* En mode retour chantier, la destination est forcée à 0. En mode transfert vers chantier, la destination doit être un chantier. */}
+                          {stockView === 'warehouse' && (stockMovementType === 'entry' || (stockMovementType === 'transfer' && newStockMovement.toProjectId === 0)) ? (
+                            <option value={0}>Magasin Central</option>
+                          ) : (
+                            projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)
+                          )}
                         </select>
                       </div>
                     )}

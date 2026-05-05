@@ -104,6 +104,7 @@ export const ProjectsPage = () => {
     finally { setIsLoadingAmendments(false); }
   };
 
+  
   const handleCreateAmendment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProject) return;
@@ -121,6 +122,40 @@ export const ProjectsPage = () => {
       loadAmendments(editingProject.id);
     } catch (err: any) { notify(err?.message || 'Erreur', 'error'); }
     finally { setIsSubmittingAmendment(false); }
+  };
+
+  const handleValidateAmendment = async (amendmentId: number, statut: 'Approuvé' | 'Rejeté') => {
+    if (!editingProject) return;
+    
+    // Ajouter l'avenant en cours de validation
+    setValidatingAmendments(prev => new Set(prev).add(amendmentId));
+    
+    try {
+      await amendmentService.updateStatus(editingProject.id, amendmentId, statut);
+      
+      // Mettre à jour la liste des avenants
+      await loadAmendments(editingProject.id);
+      
+      // Mettre à jour les infos du projet si approuvé
+      if (statut === 'Approuvé') {
+        await updateProject(editingProject.id, {});
+        notify('Avenant approuvé et projet mis à jour avec succès', 'success');
+      } else {
+        notify('Avenant rejeté', 'warning');
+      }
+      
+      // Indiquer que le DG a validé/rejeté un avenant
+      setHasValidatedAmendment(true);
+    } catch (err: any) {
+      notify(err?.message || 'Erreur lors de la validation de l\'avenant', 'error');
+    } finally {
+      // Retirer l'avenant de l'état de chargement
+      setValidatingAmendments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(amendmentId);
+        return newSet;
+      });
+    }
   };
   const [isUpdatingGantt, setIsUpdatingGantt] = useState(false);
   const [isUpdatingGanttPanel, setIsUpdatingGanttPanel] = useState(false);
@@ -143,6 +178,8 @@ export const ProjectsPage = () => {
     nouveauBudget: ''
 });
   const [isSubmittingAmendment, setIsSubmittingAmendment] = useState(false);
+  const [validatingAmendments, setValidatingAmendments] = useState<Set<number>>(new Set());
+  const [hasValidatedAmendment, setHasValidatedAmendment] = useState(false);
 
   const [newProject, setNewProject] = useState({
     name: '',
@@ -265,6 +302,13 @@ export const ProjectsPage = () => {
       loadAmendments(selectedProject.id);
     }
   }, [selectedProject]);
+
+  // Réinitialiser l'état de validation quand la modale s'ouvre
+  useEffect(() => {
+    if (isAmendmentModalOpen) {
+      setHasValidatedAmendment(false);
+    }
+  }, [isAmendmentModalOpen]);
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1584,7 +1628,7 @@ export const ProjectsPage = () => {
                     {amendments.map((a: any) => (
                       <div key={a.id} className="p-4 rounded-xl border border-slate-200 bg-white">
                         <div className="flex items-start justify-between">
-                          <div>
+                          <div className="flex-1">
                             <span className="text-xs font-black uppercase tracking-widest text-slate-400">{a.type}</span>
                             <p className="text-sm font-medium text-slate-700 mt-1">{a.justification}</p>
                             {a.type === 'Délai' && a.ancienneDate && a.nouvelleDate && (
@@ -1593,10 +1637,41 @@ export const ProjectsPage = () => {
                             {a.type === 'Budget' && a.ancienBudget && a.nouveauBudget && (
                               <p className="text-xs text-slate-500 mt-1"> {Number(a.ancienBudget).toLocaleString()} &rarr; <span className="font-bold text-[var(--color-primary)]">{Number(a.nouveauBudget).toLocaleString()} FCFA</span></p>
                             )}
+                            
+                            {/* Boutons de validation pour le DG uniquement */}
+                            {role === 'dg' && a.statut === 'En attente' && (
+                              <div className="flex gap-2 mt-3">
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  onClick={() => handleValidateAmendment(a.id, 'Approuvé')}
+                                  className="text-xs px-3 py-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                                  isLoading={validatingAmendments.has(a.id)}
+                                  disabled={validatingAmendments.has(a.id)}
+                                >
+                                  ✓ Approuver
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  onClick={() => handleValidateAmendment(a.id, 'Rejeté')}
+                                  className="text-xs px-3 py-1 border-red-300 text-red-700 hover:bg-red-50"
+                                  isLoading={validatingAmendments.has(a.id)}
+                                  disabled={validatingAmendments.has(a.id)}
+                                >
+                                  ✗ Rejeter
+                                </Button>
+                              </div>
+                            )}
                           </div>
-                          <span className={`text-xs font-black px-2 py-1 rounded-full ${a.statut === 'Approuvé' ? 'bg-emerald-100 text-emerald-700' : a.statut === 'Rejeté' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
-                            {a.statut}
-                          </span>
+                          <div className="flex flex-col items-end gap-2 ml-4">
+                            <span className={`text-xs font-black px-2 py-1 rounded-full whitespace-nowrap ${a.statut === 'Approuvé' ? 'bg-emerald-100 text-emerald-700' : a.statut === 'Rejeté' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                              {a.statut}
+                            </span>
+                            {a.statut === 'En attente' && role === 'dg' && (
+                              <span className="text-xs text-amber-600 font-medium">En attente de validation</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1604,53 +1679,55 @@ export const ProjectsPage = () => {
                 )}
               </div>
 
-              {/* Formulaire nouvel avenant */}
-              <div className="border-t border-slate-100 pt-6">
-                <h3 className="font-black text-slate-900 mb-4">Nouvel avenant</h3>
-                <form onSubmit={handleCreateAmendment} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Formulaire nouvel avenant - uniquement pour le Chef */}
+              {role !== 'dg' && (
+                <div className="border-t border-slate-100 pt-6">
+                  <h3 className="font-black text-slate-900 mb-4">Nouvel avenant</h3>
+                  <form onSubmit={handleCreateAmendment} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-bold text-slate-700">Type de modification</label>
+                        <select value={newAmendment.type} onChange={e => handleAmendmentTypeChange(e.target.value)}
+                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white font-medium">
+                          <option value="Délai"> Modification de délai</option>
+                          <option value="Budget"> Modification de budget</option>
+                          <option value="Périmètre"> Modification de périmètre</option>
+                          <option value="Autre"> Autre</option>
+                        </select>
+                      </div>
+                    </div>
+                    {newAmendment.type === 'Délai' && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Input label="Ancienne date de fin" type="date" min={today} value={newAmendment.ancienneDate}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewAmendment(p => ({ ...p, ancienneDate: e.target.value }))} 
+                          readonly className="bg-slate-100 cursor-not-allowed" />
+                        <Input label="Nouvelle date de fin" type="date" min={today} value={newAmendment.nouvelleDate}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewAmendment(p => ({ ...p, nouvelleDate: e.target.value }))} />
+                      </div>
+                    )}
+                    {newAmendment.type === 'Budget' && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Input label="Budget initial (FCFA)" type="number" min="0" value={newAmendment.ancienBudget}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewAmendment(p => ({ ...p, ancienBudget: e.target.value }))} 
+                          readonly className="bg-slate-100 cursor-not-allowed" />
+                        <Input label="Nouveau budget (FCFA)" type="number" min="0" value={newAmendment.nouveauBudget}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewAmendment(p => ({ ...p, nouveauBudget: e.target.value }))} />
+                      </div>
+                    )}
                     <div className="space-y-1.5">
-                      <label className="text-sm font-bold text-slate-700">Type de modification</label>
-                      <select value={newAmendment.type} onChange={e => handleAmendmentTypeChange(e.target.value)}
-                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white font-medium">
-                        <option value="Délai"> Modification de délai</option>
-                        <option value="Budget"> Modification de budget</option>
-                        <option value="Périmètre"> Modification de périmètre</option>
-                        <option value="Autre"> Autre</option>
-                      </select>
+                      <label className="text-sm font-bold text-slate-700">Justification <span className="text-red-500">*</span></label>
+                      <textarea value={newAmendment.justification} required
+                        onChange={e => setNewAmendment(p => ({ ...p, justification: e.target.value }))}
+                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm h-24 resize-none focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
+                        placeholder="Décrivez la raison de cette modification (retards approvisionnement, intempéries, modification client...)"/>
                     </div>
-                  </div>
-                  {newAmendment.type === 'Délai' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <Input label="Ancienne date de fin" type="date" min={today} value={newAmendment.ancienneDate}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewAmendment(p => ({ ...p, ancienneDate: e.target.value }))} 
-                        readonly className="bg-slate-100 cursor-not-allowed" />
-                      <Input label="Nouvelle date de fin" type="date" min={today} value={newAmendment.nouvelleDate}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewAmendment(p => ({ ...p, nouvelleDate: e.target.value }))} />
+                    <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+                      <Button variant="outline" type="button" onClick={() => setIsAmendmentModalOpen(false)}>Fermer</Button>
+                      <Button type="submit" isLoading={isSubmittingAmendment}>Soumettre l'avenant</Button>
                     </div>
-                  )}
-                  {newAmendment.type === 'Budget' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <Input label="Budget initial (FCFA)" type="number" min="0" value={newAmendment.ancienBudget}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewAmendment(p => ({ ...p, ancienBudget: e.target.value }))} 
-                        readonly className="bg-slate-100 cursor-not-allowed" />
-                      <Input label="Nouveau budget (FCFA)" type="number" min="0" value={newAmendment.nouveauBudget}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewAmendment(p => ({ ...p, nouveauBudget: e.target.value }))} />
-                    </div>
-                  )}
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-slate-700">Justification <span className="text-red-500">*</span></label>
-                    <textarea value={newAmendment.justification} required
-                      onChange={e => setNewAmendment(p => ({ ...p, justification: e.target.value }))}
-                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm h-24 resize-none focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
-                      placeholder="Décrivez la raison de cette modification (retards approvisionnement, intempéries, modification client...)"/>
-                  </div>
-                  <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
-                    <Button variant="outline" type="button" onClick={() => setIsAmendmentModalOpen(false)}>Fermer</Button>
-                    <Button type="submit" isLoading={isSubmittingAmendment}>Soumettre l'avenant</Button>
-                  </div>
-                </form>
-              </div>
+                  </form>
+                </div>
+              )}
             </div>
           </Modal>
         )}

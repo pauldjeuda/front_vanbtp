@@ -95,11 +95,13 @@ export const FinancesPage = () => {
   // ── Dettes ──
   const [debts, setDebts] = useState<any[]>([]);
   const [isLoadingDebts, setIsLoadingDebts] = useState(false);
+  const [isDebtsExpanded, setIsDebtsExpanded] = useState(false);
+  const [isDebtHistoryOpen, setIsDebtHistoryOpen] = useState(false);
   const [selectedDebt, setSelectedDebt] = useState<any>(null);
   const [isRepaymentModalOpen, setIsRepaymentModalOpen] = useState(false);
   const [isSubmittingRepayment, setIsSubmittingRepayment] = useState(false);
   const [newRepayment, setNewRepayment] = useState({
-    amount: '', repaymentDate: today, paymentMethod: 'Virement', reference: '', note: '',
+    amount: '', repaymentDate: today, paymentMethod: 'Virement', note: '',
   });
 
   // ── KPIs Rentabilité ──
@@ -115,21 +117,31 @@ export const FinancesPage = () => {
   // ── Forms ──
   const CATEGORY_PROVIDERS: Record<string, string> = {
     'Ciment': 'CIMENCAM', 'Acier / Fer à béton': 'QUIFEUROU',
-    'Carburant': 'TRADEX', 'Sable': 'Carrière Sanaga', 'Gravier': 'Razel Carrière',
+    'Carburant': 'VAN PETROLEUM', 'Sable': 'Carrière Sanaga', 'Gravier': 'Razel Carrière',
     "Main-d'œuvre": 'Personnel Local', 'Sous-traitance': 'PME Partenaire',
   };
   const [newExpense, setNewExpense] = useState({
-    projectId: projects[0]?.id || 0, category: 'Ciment', provider: 'CIMENCAM',
+    projectId: 0, category: 'Ciment', provider: 'CIMENCAM',
     amount: '', date: today, isClientDebt: false,
   });
   const [newInvoice, setNewInvoice] = useState({
-    projectId: projects[0]?.id || 0, period: '', amount: '', progress: '',
+    projectId: 0, period: '', amount: '', progress: '',
     client: '', categorieFacture: 'Situation Travaux' as string, dueDate: '', description: '',
   });
   const [newPayment, setNewPayment] = useState({
-    projectId: projects.length > 0 ? projects[0].id : null, client: '', amount: '',
+    projectId: 0, client: '', amount: '',
     date: today, method: 'Virement Bancaire',
   });
+
+  // Sync le projectId par défaut dès que la liste est chargée
+  React.useEffect(() => {
+    if (projects.length > 0) {
+      const firstId = projects[0].id;
+      setNewExpense(p => p.projectId === 0 ? { ...p, projectId: firstId } : p);
+      setNewInvoice(p => p.projectId === 0 ? { ...p, projectId: firstId } : p);
+      setNewPayment(p => p.projectId === 0 ? { ...p, projectId: firstId } : p);
+    }
+  }, [projects]);
 
   const getProjectNameById = (id?: number) => projects.find((p: any) => p.id === id)?.name || 'Chantier inconnu';
 
@@ -184,6 +196,10 @@ export const FinancesPage = () => {
   };
   React.useEffect(() => { if (mainTab === 'comptabilite') loadAccounting(); }, [mainTab]);
 
+  // Variables dérivées pour les dettes (calculées avant le return)
+  const activeDebts = debts.filter((d: any) => d.debtStatus !== 'Remboursé');
+  const repaidCount = debts.length - activeDebts.length;
+
   // ── Handlers ──
   const handleSendReminder = async (transactionId: number) => {
     try {
@@ -201,19 +217,33 @@ export const FinancesPage = () => {
     if (montant <= 0) { notify('Montant invalide', 'error'); return; }
     setIsSubmittingRepayment(true);
     try {
+      // 1. Enregistrer le remboursement de dette
       await debtService.addRepayment(selectedDebt.id, { ...newRepayment, amount: montant });
-      notify(`Remboursement de ${fmt(montant)} FCFA enregistré`, 'success');
+
+      // 2. Comptabiliser le remboursement comme un encaissement dans le flux financier
+      await addTransaction({
+        transactionDate: newRepayment.repaymentDate,
+        date: newRepayment.repaymentDate,
+        projectId: selectedDebt.projectId,
+        category: 'Encaissement',
+        client: selectedDebt.category || 'Remboursement client',
+        amount: montant,
+        status: 'Payé',
+        type: 'invoice',
+        paymentMethod: newRepayment.paymentMethod,
+        description: `Remboursement avance : ${selectedDebt.category}${newRepayment.reference ? ' (' + newRepayment.reference + ')' : ''}`,
+      });
+
+      notify(`Remboursement de ${fmt(montant)} FCFA enregistré et comptabilisé`, 'success');
       setIsRepaymentModalOpen(false);
-      setNewRepayment({ amount: '', repaymentDate: today, paymentMethod: 'Virement', reference: '', note: '' });
-      loadDebts();
+      setNewRepayment({ amount: '', repaymentDate: today, paymentMethod: 'Virement', note: '' });
+      loadDebts(); // auto-refresh
     } catch (err: any) { notify(err?.message || 'Erreur', 'error'); }
     finally { setIsSubmittingRepayment(false); }
   };
 
   const handleExpenseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Empêcher les soumissions multiples
     if (isSubmittingExpense) return;
     setIsSubmittingExpense(true);
 
@@ -223,38 +253,74 @@ export const FinancesPage = () => {
       return;
     }
 
-    const amount = parseInt(newExpense.amount) || 0;
-    const projectTotalEncaisse = transactions
-      .filter((t: any) => t.projectId === newExpense.projectId && t.type === 'invoice' && t.status === 'Payé')
-      .reduce((s: number, t: any) => s + t.amount, 0);
-    if (projectTotalEncaisse === 0) {
-      setFinanceErrorMessage(`Aucun encaissement pour ce chantier. Enregistrez d'abord un versement client.`);
-      setIsFinanceErrorModalOpen(true);
-      setIsExpenseModalOpen(false);
-      setExpenseStep(1);
+    // Résoudre le projectId : utiliser la valeur du form ou fallback au premier projet
+    const resolvedProjectId = newExpense.projectId || projects[0]?.id || 0;
+    const amount = parseFloat(newExpense.amount) || 0;
+
+    if (!resolvedProjectId) {
+      notify('Veuillez sélectionner un chantier', 'error');
       setIsSubmittingExpense(false);
       return;
     }
-    if (amount > projectTotalEncaisse) {
-      setFinanceErrorMessage(`Fonds insuffisants : ${fmt(projectTotalEncaisse)} FCFA disponible, ${fmt(amount)} FCFA demandé.`);
-      setIsFinanceErrorModalOpen(true);
+    if (!amount || amount <= 0) {
+      notify('Veuillez saisir un montant valide', 'error');
+      setIsSubmittingExpense(false);
+      return;
+    }
+    if (!newExpense.date) {
+      notify('Veuillez saisir une date', 'error');
       setIsSubmittingExpense(false);
       return;
     }
 
+    // Vérification du solde — SAUF si la dépense est une avance pour le client (dette)
+    if (!newExpense.isClientDebt) {
+      const projectTxs = transactions.filter((t: any) => t.projectId === resolvedProjectId);
+      const totalEncaisse = projectTxs
+        .filter((t: any) => t.type === 'invoice' && (t.category === 'Encaissement' || t.status === 'Payé'))
+        .reduce((s: number, t: any) => s + Math.abs(t.amount || 0), 0);
+      const totalDepense = projectTxs
+        .filter((t: any) => t.type === 'expense' && !t.isClientDebt)
+        .reduce((s: number, t: any) => s + Math.abs(t.amount || 0), 0);
+      const solde = totalEncaisse - totalDepense;
+
+      if (totalEncaisse === 0) {
+        setFinanceErrorMessage(`Aucun encaissement pour ce chantier. Cochez "Avance pour le client" si cette dépense doit être une avance remboursable.`);
+        setIsFinanceErrorModalOpen(true);
+        setIsExpenseModalOpen(false);
+        setExpenseStep(1);
+        setIsSubmittingExpense(false);
+        return;
+      }
+      if (amount > solde) {
+        setFinanceErrorMessage(`Fonds insuffisants. Solde disponible : ${fmt(solde)} FCFA, montant demandé : ${fmt(amount)} FCFA.`);
+        setIsFinanceErrorModalOpen(true);
+        setIsSubmittingExpense(false);
+        return;
+      }
+    }
+
     try {
       await addTransaction({
-        date: newExpense.date, projectId: newExpense.projectId,
-        category: newExpense.category.split(' ')[0], provider: newExpense.provider,
-        amount, status: 'Validé', type: 'expense', paymentMethod: 'Virement',
+        transactionDate: newExpense.date,
+        date: newExpense.date,
+        projectId: resolvedProjectId,
+        category: newExpense.category,
+        provider: newExpense.provider,
+        amount,
+        status: 'Validé',
+        type: 'expense',
+        paymentMethod: 'Virement',
+        isClientDebt: newExpense.isClientDebt,
       });
-      addLog({ module: 'Finances', action: `Dépense ${newExpense.category} - ${fmt(amount)} FCFA`, user: name || 'Utilisateur', type: 'warning' });
-      notify(`Dépense de ${fmt(amount)} FCFA enregistrée`, 'success');
+      addLog({ module: 'Finances', action: `Dépense ${newExpense.category} - ${fmt(amount)} FCFA${newExpense.isClientDebt ? ' (Avance client)' : ''}`, user: name || 'Utilisateur', type: 'warning' });
+      notify(`Dépense de ${fmt(amount)} FCFA enregistrée${newExpense.isClientDebt ? ' comme avance client' : ''}`, 'success');
       setIsExpenseModalOpen(false);
       setExpenseStep(1);
-      setNewExpense({ projectId: projects[0]?.id || 0, category: 'Ciment', provider: 'CIMENCAM', amount: '', date: today, isClientDebt: false });
+      setNewExpense({ projectId: resolvedProjectId, category: 'Ciment', provider: 'CIMENCAM', amount: '', date: today, isClientDebt: false });
+      if (newExpense.isClientDebt) loadDebts(); // auto-refresh des dettes si avance client
     } catch (err: any) {
-      notify(err?.message || 'Erreur', 'error');
+      notify(err?.message || 'Erreur lors de l\'enregistrement', 'error');
     } finally {
       setIsSubmittingExpense(false);
     }
@@ -262,28 +328,49 @@ export const FinancesPage = () => {
 
   const handleInvoiceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Empêcher les soumissions multiples
     if (isSubmittingInvoice) return;
     setIsSubmittingInvoice(true);
 
-    const amount = parseInt(newInvoice.amount) || 0;
+    const resolvedProjectId = newInvoice.projectId || projects[0]?.id || 0;
+    const amount = parseFloat(newInvoice.amount) || 0;
+
+    if (!resolvedProjectId) {
+      notify('Veuillez sélectionner un chantier', 'error');
+      setIsSubmittingInvoice(false);
+      return;
+    }
+    if (!amount || amount <= 0) {
+      notify('Veuillez saisir un montant valide', 'error');
+      setIsSubmittingInvoice(false);
+      return;
+    }
+    if (!newInvoice.client.trim()) {
+      notify('Veuillez saisir le nom du client', 'error');
+      setIsSubmittingInvoice(false);
+      return;
+    }
+
     try {
       await addTransaction({
-        date: today,
         transactionDate: today,
-        projectId: newInvoice.projectId,
-        category: newInvoice.categorieFacture, categorieFacture: newInvoice.categorieFacture,
-        client: newInvoice.client || projects.find((p: any) => p.id === newInvoice.projectId)?.client || 'Client',
-        amount, status: 'En attente', type: 'invoice', paymentMethod: 'Virement',
-        dueDate: newInvoice.dueDate || undefined, description: newInvoice.description || undefined,
+        date: today,
+        projectId: resolvedProjectId,
+        category: newInvoice.categorieFacture,
+        categorieFacture: newInvoice.categorieFacture,
+        client: newInvoice.client || projects.find((p: any) => p.id === resolvedProjectId)?.client || 'Client',
+        amount,
+        status: 'En attente',
+        type: 'invoice',
+        paymentMethod: 'Virement',
+        dueDate: newInvoice.dueDate || undefined,
+        description: newInvoice.description || undefined,
       });
       addLog({ module: 'Finances', action: `Facture ${newInvoice.categorieFacture} - ${fmt(amount)} FCFA`, user: name || 'Utilisateur', type: 'info' });
       notify(`Facture de ${fmt(amount)} FCFA émise`, 'success');
       setIsInvoiceModalOpen(false);
-      setNewInvoice({ projectId: projects[0]?.id || 0, period: '', amount: '', progress: '', client: '', categorieFacture: 'Situation Travaux', dueDate: '', description: '' });
+      setNewInvoice({ projectId: resolvedProjectId, period: '', amount: '', progress: '', client: '', categorieFacture: 'Situation Travaux', dueDate: '', description: '' });
     } catch (err: any) {
-      notify(err?.message || 'Erreur', 'error');
+      notify(err?.message || 'Erreur lors de l\'émission', 'error');
     } finally {
       setIsSubmittingInvoice(false);
     }
@@ -291,33 +378,48 @@ export const FinancesPage = () => {
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Empêcher les soumissions multiples
     if (isSubmittingPayment) return;
     setIsSubmittingPayment(true);
 
-    const amount = parseInt(newPayment.amount) || 0;
-    
-    // Validation des champs obligatoires
-    if (!newPayment.projectId || newPayment.projectId === 0 || !newPayment.date || !amount || amount <= 0) {
-      notify('Veuillez remplir tous les champs obligatoires (chantier, montant, date)', 'error');
+    // Résoudre le projectId : valeur saisie OU premier projet disponible
+    const resolvedProjectId = newPayment.projectId || projects[0]?.id || 0;
+    const amount = parseFloat(newPayment.amount) || 0;
+
+    // Validations individuelles avec messages précis
+    if (!resolvedProjectId) {
+      notify('Veuillez sélectionner un chantier', 'error');
       setIsSubmittingPayment(false);
       return;
     }
-    
+    if (!amount || amount <= 0) {
+      notify('Veuillez saisir un montant valide (> 0)', 'error');
+      setIsSubmittingPayment(false);
+      return;
+    }
+    if (!newPayment.date) {
+      notify('Veuillez saisir une date de paiement', 'error');
+      setIsSubmittingPayment(false);
+      return;
+    }
+
     try {
       await addTransaction({
         transactionDate: newPayment.date,
-        projectId: newPayment.projectId,
-        category: 'Encaissement', client: newPayment.client || 'Client',
-        amount, status: 'Payé', type: 'invoice', paymentMethod: newPayment.method,
+        date: newPayment.date,
+        projectId: resolvedProjectId,
+        category: 'Encaissement',
+        client: newPayment.client || 'Client',
+        amount,
+        status: 'Payé',
+        type: 'invoice',
+        paymentMethod: newPayment.method,
       });
       addLog({ module: 'Finances', action: `Encaissement - ${fmt(amount)} FCFA`, user: name || 'Utilisateur', type: 'success' });
-      notify(`Encaissement de ${fmt(amount)} FCFA validé`, 'success');
+      notify(`Encaissement de ${fmt(amount)} FCFA enregistré`, 'success');
       setIsPaymentModalOpen(false);
-      setNewPayment({ projectId: projects[0]?.id || 0, client: '', amount: '', date: today, method: 'Virement Bancaire' });
+      setNewPayment({ projectId: resolvedProjectId, client: '', amount: '', date: today, method: 'Virement Bancaire' });
     } catch (err: any) {
-      notify(err?.message || 'Erreur', 'error');
+      notify(err?.message || 'Erreur lors de l\'enregistrement', 'error');
     } finally {
       setIsSubmittingPayment(false);
     }
@@ -525,53 +627,81 @@ export const FinancesPage = () => {
             )}
           </Card>
 
-          {/* Dettes client */}
-          {(debts.length > 0 || isLoadingDebts) && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  Avances pour client
-                  {debts.length > 0 && <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">{debts.length}</span>}
-                </h2>
-                <button onClick={loadDebts} disabled={isLoadingDebts}
-                  className="text-xs text-slate-400 hover:text-slate-600 font-medium flex items-center gap-1 disabled:opacity-50">
-                  <RefreshCw className={`w-3 h-3 ${isLoadingDebts ? 'animate-spin' : ''}`} /> Actualiser
+          {/* Dettes client — accordéon */}
+          <div className="border border-slate-200 rounded-2xl overflow-hidden">
+            {/* En-tête accordéon */}
+            <button
+              type="button"
+              onClick={() => { setIsDebtsExpanded(v => !v); if (!isDebtsExpanded && debts.length === 0) loadDebts(); }}
+              className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 hover:bg-amber-100 transition-colors"
+            >
+              <span className="flex items-center gap-2 text-sm font-bold text-amber-800">
+                Avances pour client
+                {activeDebts.length > 0 && (
+                  <span className="text-xs font-bold text-amber-700 bg-amber-200 px-2 py-0.5 rounded-full">{activeDebts.length} en cours</span>
+                )}
+              </span>
+              <span className={`text-amber-600 transition-transform duration-200 ${isDebtsExpanded ? 'rotate-180' : ''}`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </span>
+            </button>
+
+            {/* Contenu de l'accordéon */}
+            {isDebtsExpanded && (
+              <div className="p-3 space-y-3 bg-white">
+                {isLoadingDebts ? (
+                  <div className="flex justify-center py-6">
+                    <div className="animate-spin h-6 w-6 border-2 border-amber-500 border-t-transparent rounded-full" />
+                  </div>
+                ) : activeDebts.length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-4">Aucune avance en cours</p>
+                ) : (
+                  <div className="grid gap-3">
+                    {activeDebts.map((debt: any) => {
+                      const remaining = Number(debt.amount) - Number(debt.debtAmountPaid || 0);
+                      const pct = Math.min(100, Math.round((Number(debt.debtAmountPaid || 0) / Number(debt.amount)) * 100));
+                      return (
+                        <div key={debt.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <p className="text-sm font-semibold text-slate-900">{debt.category} — {debt.project?.name || 'Chantier'}</p>
+                              <p className="text-xs text-slate-400 mt-0.5">{debt.transactionDate}</p>
+                            </div>
+                            <div className="text-right flex flex-col items-end gap-1">
+                              <p className="text-sm font-bold text-slate-900">{fmt(Number(debt.amount))} FCFA</p>
+                              <StatusBadge status={debt.debtStatus || 'Non remboursé'} />
+                            </div>
+                          </div>
+                          <div className="h-1 bg-slate-200 rounded-full mb-2">
+                            <div className="h-1 bg-emerald-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs text-slate-500">Reste dû : <span className="font-bold text-red-600">{fmt(remaining)} FCFA</span> <span className="text-slate-400">({pct}% remboursé)</span></p>
+                            <button
+                              onClick={() => { setSelectedDebt(debt); setIsRepaymentModalOpen(true); }}
+                              className="text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
+                            >
+                              + Remboursement
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Bouton historique */}
+                <button
+                  type="button"
+                  onClick={() => { if (debts.length === 0) loadDebts(); setIsDebtHistoryOpen(true); }}
+                  className="w-full flex items-center justify-center gap-2 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors mt-1"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  Historique{repaidCount > 0 ? ` (${repaidCount} remboursé${repaidCount > 1 ? 's' : ''})` : ''}
                 </button>
               </div>
-              <div className="grid gap-3">
-                {debts.map((debt: any) => {
-                  const remaining = Number(debt.amount) - Number(debt.debtAmountPaid || 0);
-                  const pct = Math.min(100, Math.round((Number(debt.debtAmountPaid || 0) / Number(debt.amount)) * 100));
-                  return (
-                    <Card key={debt.id} className="p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <p className="font-semibold text-slate-900">{debt.category} — {debt.project?.name || 'Chantier'}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">{debt.transactionDate}</p>
-                        </div>
-                        <div className="text-right flex flex-col items-end gap-1">
-                          <p className="font-bold text-slate-900">{fmt(Number(debt.amount))} FCFA</p>
-                          <StatusBadge status={debt.debtStatus || 'Non remboursé'} />
-                        </div>
-                      </div>
-                      <div className="h-1.5 bg-slate-100 rounded-full mb-2">
-                        <div className="h-1.5 bg-emerald-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-slate-500">Reste dû : <span className="font-bold text-red-600">{fmt(remaining)} FCFA</span></p>
-                        {debt.debtStatus !== 'Remboursé' && (
-                          <button onClick={() => { setSelectedDebt(debt); setIsRepaymentModalOpen(true); }}
-                            className="text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors">
-                            + Remboursement
-                          </button>
-                        )}
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 
@@ -914,8 +1044,11 @@ export const FinancesPage = () => {
         <form onSubmit={handlePaymentSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-700">Chantier *</label>
-            <select value={newPayment.projectId} onChange={e => setNewPayment(p => ({ ...p, projectId: Number(e.target.value) }))}
+            <select
+              value={newPayment.projectId || ''}
+              onChange={e => setNewPayment(p => ({ ...p, projectId: Number(e.target.value) }))}
               className="w-full h-10 px-3 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
+              <option value="" disabled>-- Choisir un chantier --</option>
               {projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
@@ -926,7 +1059,7 @@ export const FinancesPage = () => {
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPayment(p => ({ ...p, amount: e.target.value }))} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input label="Date *" type="date" min={today} required value={newPayment.date}
+            <Input label="Date *" type="date" required value={newPayment.date}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPayment(p => ({ ...p, date: e.target.value }))} />
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-slate-700">Mode</label>
@@ -1011,19 +1144,15 @@ export const FinancesPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Input label="Montant (FCFA) *" type="number" min="0" required value={newRepayment.amount}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewRepayment(p => ({ ...p, amount: e.target.value }))} />
-                <Input label="Date *" type="date" min={today} required value={newRepayment.repaymentDate}
+                <Input label="Date *" type="date" required value={newRepayment.repaymentDate}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewRepayment(p => ({ ...p, repaymentDate: e.target.value }))} />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-slate-700">Mode</label>
-                  <select value={newRepayment.paymentMethod} onChange={e => setNewRepayment(p => ({ ...p, paymentMethod: e.target.value }))}
-                    className="w-full h-10 px-3 border border-slate-200 rounded-xl text-sm bg-white">
-                    {['Virement', 'Chèque', 'Espèces', 'Mobile Money'].map(m => <option key={m}>{m}</option>)}
-                  </select>
-                </div>
-                <Input label="Référence" value={newRepayment.reference} placeholder="N° virement…"
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewRepayment(p => ({ ...p, reference: e.target.value }))} />
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-slate-700">Mode de paiement</label>
+                <select value={newRepayment.paymentMethod} onChange={e => setNewRepayment(p => ({ ...p, paymentMethod: e.target.value }))}
+                  className="w-full h-10 px-3 border border-slate-200 rounded-xl text-sm bg-white">
+                  {['Virement', 'Chèque', 'Espèces', 'Mobile Money'].map(m => <option key={m}>{m}</option>)}
+                </select>
               </div>
               <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
                 <button type="button" onClick={() => setIsRepaymentModalOpen(false)}
@@ -1035,6 +1164,58 @@ export const FinancesPage = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Historique des dettes */}
+      {isDebtHistoryOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setIsDebtHistoryOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Historique des avances client</h3>
+                <p className="text-xs text-slate-400 mt-0.5">{debts.length} enregistrement{debts.length > 1 ? 's' : ''} au total</p>
+              </div>
+              <button onClick={() => setIsDebtHistoryOpen(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="overflow-y-auto p-4 space-y-3">
+              {debts.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-8">Aucune avance enregistrée</p>
+              ) : (
+                debts.map((debt: any) => {
+                  const paid = Number(debt.debtAmountPaid || 0);
+                  const total = Number(debt.amount);
+                  const pct = Math.min(100, Math.round((paid / total) * 100));
+                  const isFullyRepaid = debt.debtStatus === 'Remboursé';
+                  return (
+                    <div key={debt.id} className={`p-4 rounded-xl border ${isFullyRepaid ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold text-slate-900">{debt.category}</p>
+                            {isFullyRepaid && (
+                              <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-semibold">✓ Soldé</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-400">{debt.project?.name || 'Chantier'} • {debt.transactionDate}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-slate-900">{fmt(total)} FCFA</p>
+                          <p className="text-xs text-slate-500">Remboursé : {fmt(paid)} FCFA</p>
+                        </div>
+                      </div>
+                      <div className="h-1.5 bg-slate-200 rounded-full">
+                        <div className={`h-1.5 rounded-full transition-all ${isFullyRepaid ? 'bg-emerald-500' : 'bg-amber-400'}`} style={{ width: `${pct}%` }} />
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1 text-right">{pct}% remboursé</p>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
       )}

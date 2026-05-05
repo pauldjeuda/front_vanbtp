@@ -198,6 +198,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       date: a.date || a.auditDate || '',
       auditDate: a.auditDate || a.date || '',
       auditor: a.auditor || '',
+      location: a.location || '',
       status: a.status || 'Planifié',
       notes: a.notes || a.observations || '',
       observations: a.observations || a.notes || '',
@@ -241,6 +242,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   const normalizeStockMovement = (m: any) => {
     const projectId = Number(m.projectId || 0);
+    const projectName = projectId === 0 ? 'Magasin Central' : (projectNameById[projectId] || m.project?.name || 'Chantier inconnu');
     return {
       id: m.id,
       date: m.date || m.movementDate || '',
@@ -251,9 +253,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       quantity: Number(m.quantity ?? m.qty ?? 0),
       unit: m.unit || '',
       projectId,
-      chantier: projectNameById[projectId] || m.project?.name || '',
+      chantier: projectName,
       user: m.user || '',
-      project: projectNameById[projectId] || m.project?.name || ''
+      project: projectName
     };
   };
 
@@ -610,6 +612,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       title: audit.title || audit.type,
       auditDate: audit.auditDate || audit.date || new Date().toISOString().split('T')[0],
       projectId,
+      auditor: audit.auditor || '',
+      location: audit.location || '',
       observations: audit.observations || audit.notes || '',
       recommendations: audit.recommendations || '',
       score: audit.score,
@@ -675,17 +679,28 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addStockMovement = async (movement: any) => {
-    const projectId = resolveProjectId(movement.projectId || movement.toProjectId || movement.chantier || movement.toChantier || movement.fromChantier);
+    // Utiliser explicitement projectId s'il est fourni (même si c'est 0), sinon essayer les alternatives
+    const rawId = movement.projectId !== undefined ? movement.projectId : 
+                 (movement.toProjectId !== undefined ? movement.toProjectId : 
+                 (movement.chantier || movement.toChantier || movement.fromChantier));
+    
+    const projectId = resolveProjectId(rawId);
     const payload = {
       type: movement.type,
       item: movement.item,
       quantity: Number(movement.quantity ?? movement.qty ?? 0),
       unit: movement.unit || '',
       projectId,
-      movementDate: movement.movementDate || movement.date || new Date().toISOString().split('T')[0]
+      movementDate: movement.movementDate || movement.date || new Date().toISOString().split('T')[0],
+      toProjectId: movement.toProjectId,
+      note: movement.note
     };
     const created = await stockService.create(payload);
-    setStockMovements((prev) => [normalizeStockMovement(created), ...prev]);
+    if (created.source && created.dest) {
+      setStockMovements((prev) => [normalizeStockMovement(created.source), normalizeStockMovement(created.dest), ...prev]);
+    } else {
+      setStockMovements((prev) => [normalizeStockMovement(created), ...prev]);
+    }
   };
 
   const addTicket = async (ticket: Partial<Ticket> & { title: string; description?: string; module?: string; priority?: string }) => {
